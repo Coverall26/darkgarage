@@ -3,7 +3,7 @@
 > **Date**: February 9, 2026
 > **Status**: Active — all team members must follow these rules
 
-> **See also:** [`docs/BUG_MONITORING_TOOLS_REPORT.md`](./BUG_MONITORING_TOOLS_REPORT.md) — Section 7 covers CI/CD pipelines for bug detection, and Section 6 covers the full Jest test suite with all 22 test scripts.
+> **See also:** [`CONTRIBUTING.md`](../CONTRIBUTING.md) for testing requirements and CI/CD workflow reference.
 
 ## What Happened
 
@@ -17,7 +17,7 @@ Three issues combined to create the problem:
 
 2. **Too many triggers** — Every push to *any* branch triggered 3 separate workflows (Preview Deploy, Tests, Production Deploy). A single PR with 5 commits created 15+ workflow runs.
 
-3. **GitHub Free Plan limits** — The `Darkroom4` account is on GitHub's Free plan, which provides **2,000 minutes/month** for private repos. With so many runs queued, the available runner capacity was exhausted.
+3. **GitHub Free Plan limits** — The GitHub organization is on the Free plan, which provides **2,000 minutes/month** for private repos. With so many runs queued, the available runner capacity was exhausted.
 
 ### What Was Fixed
 
@@ -201,4 +201,4 @@ concurrency:
 
 - **CI/CD issues**: Check the Actions tab first, then ask in the team channel
 - **Urgent deploys**: Use `npx vercel --prod` as a fallback
-- **Account billing**: Contact the account owner (Darkroom4 on GitHub)
+- **Account billing**: Contact the account owner on GitHub

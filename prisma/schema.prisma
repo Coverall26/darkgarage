@@ -48,6 +48,28 @@ datasource db {
 //      ReportTemplate, GeneratedReport.
 //    Phase 2: Migrate all legacy fields to the best-practice pattern. Each affected field is
 //    annotated with a "NAMING INCONSISTENCY" comment in-line.
+//
+// =============================================================================
+// ENCRYPTED FIELDS (AES-256-GCM via lib/crypto/secure-storage.ts)
+// =============================================================================
+//
+// The following fields store AES-256-GCM encrypted data (JSON: {ciphertext, iv, authTag, version}).
+// Key source: NEXT_PRIVATE_DOCUMENT_PASSWORD_KEY env var (required in production).
+//
+//   - Organization.ein              — Employer Identification Number
+//   - Investor.taxId                — SSN or EIN (via taxIdEncrypted)
+//   - Investor.custodianEin         — Custodian EIN for IRA/retirement accounts
+//   - Fund.wireInstructions (JSON)  — accountNumber and routingNumber fields
+//
+// Additional encryption:
+//   - User.password                 — bcrypt (12 rounds, one-way hash)
+//   - User.mfaSecret               — AES-256-GCM via MFA_ENCRYPTION_KEY
+//   - BankLink.plaidAccessToken     — AES-256-GCM via PLAID_TOKEN_ENCRYPTION_KEY
+//   - SignatureDocument metadata    — Signature images encrypted via NEXT_PRIVATE_DOCUMENT_PASSWORD_KEY
+//   - Storage objects               — AES-256-GCM via STORAGE_ENCRYPTION_KEY
+//   - Organization credentials      — AES-256-GCM via STORAGE_ENCRYPTION_KEY
+//
+// See docs/ENCRYPTION_AUDIT.md for the full field-level encryption audit.
 // =============================================================================
 
 model Account {
@@ -70,6 +92,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -221,6 +244,7 @@ model VerificationToken {
   updatedAt DateTime @updatedAt
 
   @@unique([identifier, token])
+  @@index([expires])
 }
 
 // Stores callback URLs separately to prevent email scanners from consuming tokens
@@ -439,6 +463,8 @@ model Invitation {
   token     String   @unique
 
   @@unique([email, teamId])
+  @@index([teamId])
+  @@index([expires])
 }
 
 enum EmailType {
@@ -786,6 +812,10 @@ model Investor {
   fundId String?
   fund   Fund?   @relation(fields: [fundId], references: [id], onDelete: SetNull)
 
+  // Multi-tenant defense-in-depth: denormalized from Fund.teamId for direct query filtering
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
   entityName String?
   entityType String  @default("INDIVIDUAL")
   taxId      String? // Encrypted via encryptTaxId() — stores AES-256-GCM ciphertext
@@ -919,6 +949,7 @@ model Investor {
   // @@index([fundId]) — REMOVED: redundant, covered by @@index([fundId, accreditationStatus])
   @@index([accreditationStatus])
   @@index([fundId, accreditationStatus])
+  @@index([teamId])
 }
 
 model InvestorDocument {
@@ -984,15 +1015,11 @@ enum LPDocumentStatus {
   ARCHIVED
 }
 
-enum InvestorStage {
-  APPLIED
-  UNDER_REVIEW
-  APPROVED
-  REJECTED
-  COMMITTED
-  DOCS_APPROVED
-  FUNDED
-}
+// NOTE: InvestorStage is NOT a Prisma enum — it's defined as a TypeScript type in
+// lib/investor/approval-pipeline.ts via INVESTOR_STAGES const array. The 7 stages
+// (APPLIED, UNDER_REVIEW, APPROVED, REJECTED, COMMITTED, DOCS_APPROVED, FUNDED) are
+// tracked in Investor.fundData JSON, not as a typed column. Do not re-add this enum
+// unless migrating fundData.approvalStage to a typed column.
 
 enum InvestmentStatus {
   APPLIED
@@ -1481,6 +1508,10 @@ model Investment {
   investorId String
   investor   Investor @relation(fields: [investorId], references: [id], onDelete: Restrict)
 
+  // Multi-tenant defense-in-depth: denormalized from Fund.teamId for direct query filtering
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
   commitmentAmount Decimal          @db.Decimal(18, 2)
   fundedAmount     Decimal          @default(0) @db.Decimal(18, 2)
   status           InvestmentStatus @default(COMMITTED)
@@ -1508,12 +1539,17 @@ model Investment {
   @@index([isStaged])
   @@index([fundId, status])
   @@index([fundId, isStaged])
+  @@index([teamId])
 }
 
 model CapitalCall {
   id     String @id @default(cuid())
   fundId String
   fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Restrict)
+
+  // Multi-tenant defense-in-depth: denormalized from Fund.teamId for direct query filtering
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Restrict)
 
   callNumber        Int
   amount            Decimal           @db.Decimal(18, 2)
@@ -1542,6 +1578,7 @@ model CapitalCall {
 
   // @@index([fundId]) — REMOVED: redundant, covered by @@index([fundId, status])
   @@index([fundId, status])
+  @@index([teamId])
 }
 
 enum CapitalCallStatus {
@@ -1603,6 +1640,10 @@ model InvestmentTranche {
   investmentId String
   investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Restrict)
 
+  // Multi-tenant defense-in-depth: denormalized from Investment.Fund.teamId for direct query filtering
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
   // Tranche Identity
   trancheNumber Int // 1-indexed order within the investment
   label         String // "Initial Capital Call", "Tranche 2", etc.
@@ -1643,6 +1684,7 @@ model InvestmentTranche {
   @@index([scheduledDate])
   @@index([investmentId, status])
   @@index([capitalCallId])
+  @@index([teamId])
 }
 
 // ─── Fund Closing Rounds ────────────────────────────────────────────────────
@@ -1699,6 +1741,10 @@ model Distribution {
   fundId String
   fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Restrict)
 
+  // Multi-tenant defense-in-depth: denormalized from Fund.teamId for direct query filtering
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
   distributionNumber Int
   totalAmount        Decimal            @db.Decimal(18, 2)
   distributionType   DistributionType   @default(DIVIDEND)
@@ -1710,6 +1756,7 @@ model Distribution {
 
   @@index([fundId])
   @@index([status])
+  @@index([teamId])
 }
 
 enum DistributionStatus {
@@ -1925,6 +1972,10 @@ model Transaction {
   fundId         String?
   fund           Fund?   @relation(fields: [fundId], references: [id], onDelete: Restrict)
 
+  // Multi-tenant defense-in-depth: denormalized from Fund.teamId for direct query filtering
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
   // Payment method (Phase 2: Stripe ACH integration)
   paymentMethod         PaymentMethodType? // How funds were transferred
   stripePaymentIntentId String? // Stripe PaymentIntent ID (Phase 2: ACH Direct Debit)
@@ -1981,6 +2032,7 @@ model Transaction {
   @@index([fundId, type, completedAt]) // Composite index for time-based AUM reporting
   @@index([investorId, type, status]) // Composite index for investor transaction summaries
   @@index([confirmedBy])
+  @@index([teamId])
 }
 
 // Manual Investment Entry - For tracking off-platform investments
@@ -2501,6 +2553,12 @@ model Team {
 
   // LP Portal - Fund Management
   funds             Fund[]
+  investors         Investor[]
+  investments       Investment[]
+  transactions      Transaction[]
+  distributions     Distribution[]
+  capitalCalls      CapitalCall[]
+  investmentTranches InvestmentTranche[]
   investorNotes     InvestorNote[]
   entities          Entity[]
   manualInvestments ManualInvestment[]
@@ -3633,6 +3691,8 @@ model Integration {
   updatedAt   DateTime @updatedAt
 
   installedIntegrations InstalledIntegration[]
+
+  @@index([category])
 }
 
 model InstalledIntegration {

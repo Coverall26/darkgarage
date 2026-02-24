@@ -10,6 +10,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { resolveCrmRole } from "@/lib/auth/crm-roles";
+import { validateBody } from "@/lib/middleware/validate";
+import { ContactFollowUpSchema } from "@/lib/validations/teams";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +53,14 @@ export async function PUT(
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
 
-    const body = await req.json();
-    const { nextFollowUpAt } = body;
+    const parsed = await validateBody(req, ContactFollowUpSchema);
+    if (parsed.error) return parsed.error;
+    const { nextFollowUpDate } = parsed.data;
 
     // Validate date if provided
     let parsedDate: Date | null = null;
-    if (nextFollowUpAt !== null && nextFollowUpAt !== undefined) {
-      parsedDate = new Date(nextFollowUpAt);
+    if (nextFollowUpDate !== null && nextFollowUpDate !== undefined) {
+      parsedDate = new Date(nextFollowUpDate);
       if (isNaN(parsedDate.getTime())) {
         return NextResponse.json({ error: "Invalid date" }, { status: 400 });
       }

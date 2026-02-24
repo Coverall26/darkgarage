@@ -72,7 +72,7 @@ Full-day build session spanning ~14 hours (Feb 15, 04:00 UTC – 17:00 UTC). Shi
 | 4 | `Step4Dataroom.tsx` | 248 | Dataroom name, description, default policies (download, watermark, NDA gate), shareable link generation |
 | 5 | `Step5FundDetails.tsx` | 612 | GP Fund: fund name, type (VC/PE/RE/Hedge/FoF/Search), target, waterfall (European/American), hurdle rate, term/extension, management fee, carry. Wire instructions with AES-256 encryption. Startup: instrument type (SAFE/Conv Note/Priced/SPV) with dynamic terms. DATAROOM_ONLY: skipped |
 | 6 | `Step6LPOnboarding.tsx` | 312 | Onboarding steps with drag-reorder, document templates with upload/default/preview, accreditation method (Self-Cert/Third-Party/Min-Invest/Persona), notification preferences (6 toggles) |
-| 7 | `Step7Integrations.tsx` | 178 | Active service indicators (Resend, Stripe, Persona, Tinybird, Rollbar), compliance settings (MFA, session timeout, audit retention) |
+| 7 | `Step7Integrations.tsx` | 178 | Active service indicators (Resend, Stripe, Persona, PostHog, Rollbar), compliance settings (MFA, session timeout, audit retention) |
 | 8 | `Step8Launch.tsx` | 305 | Summary review of all steps, setup progress checklist, activation status, "Launch Organization" button |
 | — | `WizardProgress.tsx` | 102 | Step indicator with labels, completed/active/skipped states, click navigation |
 | — | `useWizardState.ts` | 285 | Shared hook: step management, form data, validation, auto-save (3s debounce), API persistence |

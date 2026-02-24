@@ -1,7 +1,7 @@
 /**
  * Analytics Event Tracking Layer
  *
- * Centralized event tracking that fans out to PostHog and Tinybird.
+ * Centralized event tracking that fans out to PostHog.
  * Provides typed event definitions for funnels, engagement, and feature usage.
  * All events respect cookie consent before firing.
  */

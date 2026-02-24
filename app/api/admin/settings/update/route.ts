@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { validateBody } from "@/lib/middleware/validate";
+import { SettingsUpdateSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +26,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { teamId, section, data, applyToExisting } = body;
-
-  if (!teamId || !section || !data) {
-    return NextResponse.json(
-      { error: "teamId, section, and data are required" },
-      { status: 400 },
-    );
-  }
+  const parsed = await validateBody(req, SettingsUpdateSchema);
+  if (parsed.error) return parsed.error;
+  const { teamId, section, data, applyToExisting } = parsed.data;
 
   try {
     // Verify admin access

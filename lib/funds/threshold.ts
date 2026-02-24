@@ -168,7 +168,7 @@ export async function updateAggregateProgress(
     ? Math.min(100, (totalCommitted / fullAuthorizedAmount) * 100) 
     : 0;
 
-  const updates: any = {
+  const updates: Record<string, unknown> = {
     fullAuthorizedProgress,
   };
 

@@ -340,7 +340,7 @@ const routeHandlers = {
       }
 
       // Prepare update data
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
 
       if (data.editedQuestion)
         updateData.editedQuestion = validateContent(data.editedQuestion);

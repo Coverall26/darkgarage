@@ -6,7 +6,6 @@ import { getServerSession } from "next-auth/next";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { redis } from "@/lib/redis";
-import { getDocumentDurationPerViewer } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 import { Prisma } from "@prisma/client";
 
@@ -23,33 +22,43 @@ async function fetchAndCacheDurations(
     const parsedDurations = typeof cachedDurations === 'string' ? JSON.parse(cachedDurations) : cachedDurations;
     durationsMap = parsedDurations;
   } else {
-    const batchSize = 10; 
-    for (let i = 0; i < groupedViews.length; i += batchSize) {
-      const batch = groupedViews.slice(i, i + batchSize);
+    // Collect all viewIds across all documents for a single Prisma query
+    const allViewIds = groupedViews.flatMap((view) => view.viewIds);
 
-      const batchPromises = batch.map(async (view) => {
-        try {
-          const durationResult = await getDocumentDurationPerViewer({
-            documentId: view.documentId,
-            viewIds: view.viewIds.join(","),
-          });
-          return {
-            documentId: view.documentId,
-            totalDuration: durationResult.data[0]?.sum_duration || 0,
-          };
-        } catch (error) {
-          console.error(`Error fetching duration for document ${view.documentId}:`, error);
-          return {
-            documentId: view.documentId,
-            totalDuration: 0,
-          };
+    if (allViewIds.length > 0) {
+      try {
+        // Query PageView durations grouped by viewId
+        const durationResults = await prisma.pageView.groupBy({
+          by: ["viewId"],
+          where: {
+            viewId: { in: allViewIds },
+          },
+          _sum: {
+            duration: true,
+          },
+        });
+
+        // Build a map of viewId -> duration in seconds
+        const viewDurationMap: Record<string, number> = {};
+        for (const row of durationResults) {
+          viewDurationMap[row.viewId] = Math.round((row._sum.duration || 0) / 1000);
         }
-      });
 
-      const batchResults = await Promise.all(batchPromises);
-      batchResults.forEach(result => {
-        durationsMap[result.documentId] = result.totalDuration;
-      });
+        // Aggregate per document
+        for (const view of groupedViews) {
+          let totalDuration = 0;
+          for (const vid of view.viewIds) {
+            totalDuration += viewDurationMap[vid] || 0;
+          }
+          durationsMap[view.documentId] = totalDuration;
+        }
+      } catch (error) {
+        console.error("Error fetching durations from PageView:", error);
+        // Fall back to zeros
+        for (const view of groupedViews) {
+          durationsMap[view.documentId] = 0;
+        }
+      }
     }
 
     if (redis) {

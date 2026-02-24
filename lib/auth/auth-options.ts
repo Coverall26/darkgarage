@@ -286,7 +286,7 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async createUser(message) {
-      // Fire-and-forget server-side funnel event to Tinybird (no PII — userId only)
+      // Fire-and-forget server-side funnel event to PostHog (no PII — userId only)
       publishServerEvent("funnel_signup_completed", {
         userId: message.user.id,
         method: "email",

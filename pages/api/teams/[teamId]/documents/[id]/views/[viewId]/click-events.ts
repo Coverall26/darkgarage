@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { getServerSession } from "next-auth/next";
 
 import prisma from "@/lib/prisma";
-import { getClickEventsByView } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
 
@@ -53,12 +52,8 @@ export default async function handler(
       return res.status(403).end("Forbidden");
     }
 
-    const data = await getClickEventsByView({
-      document_id: id,
-      view_id: viewId,
-    });
-
-    return res.status(200).json(data);
+    // Click events have no Prisma model - return empty data
+    return res.status(200).json({ data: [] });
   } catch (error) {
     log({
       message: `Failed to get click events for document ${id} and view ${viewId}. \n\n ${error}`,

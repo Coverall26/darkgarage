@@ -197,6 +197,7 @@ export async function POST(req: NextRequest) {
             const created = await prisma.investor.create({
               data: {
                 userId: investor.userId,
+                teamId,
                 entityName: investor.entityName,
                 entityType: investor.entityType || "INDIVIDUAL",
                 taxId: investor.taxId ? encryptTaxId(investor.taxId) : null,
@@ -240,6 +241,7 @@ export async function POST(req: NextRequest) {
               data: {
                 fundId,
                 investorId,
+                teamId,
                 commitmentAmount: investment.commitmentAmount,
                 fundedAmount: investment.fundedAmount || 0,
                 status: investment.status || "COMMITTED",
@@ -278,6 +280,7 @@ export async function POST(req: NextRequest) {
             const created = await prisma.capitalCall.create({
               data: {
                 fundId,
+                teamId,
                 callNumber: call.callNumber,
                 amount: call.amount,
                 purpose: call.purpose,
@@ -317,6 +320,7 @@ export async function POST(req: NextRequest) {
             const created = await prisma.distribution.create({
               data: {
                 fundId,
+                teamId,
                 distributionNumber: dist.distributionNumber,
                 totalAmount: dist.totalAmount,
                 distributionType: dist.distributionType || "DIVIDEND",
@@ -356,6 +360,7 @@ export async function POST(req: NextRequest) {
                   ? idMappings.distributions[tx.distributionId] || tx.distributionId
                   : null,
                 fundId: tx.fundId ? idMappings.funds[tx.fundId] || tx.fundId : null,
+                teamId,
                 status: tx.status || "PENDING",
                 statusMessage: tx.statusMessage,
               },

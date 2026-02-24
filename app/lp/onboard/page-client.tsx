@@ -41,7 +41,7 @@ const NDAStep = React.lazy(() => import("./steps/NDAStep"));
 const CommitmentStep = React.lazy(() => import("./steps/CommitmentStep"));
 const InvestorTypeStep = React.lazy(() => import("@/components/onboarding/InvestorTypeStep"));
 const FundingStep = React.lazy(() => import("@/components/onboarding/FundingStep").then(m => ({ default: m.FundingStep })));
-const SequentialSigningFlow = React.lazy(() => import("@/components/signature/sequential-signing-flow").then(m => ({ default: m.SequentialSigningFlow })));
+const FundRoomSignFlow = React.lazy(() => import("@/components/esign/FundRoomSignFlow").then(m => ({ default: m.FundRoomSignFlow })));
 const KycVerification = React.lazy(() => import("@/components/lp/kyc-verification").then(m => ({ default: m.KycVerification })));
 
 // Types and validation helpers (imported synchronously)
@@ -79,6 +79,8 @@ const INITIAL_FORM: FormData = {
   noThirdPartyFinancing: false,
   sourceOfFunds: "",
   occupation: "",
+  accreditationDocIds: [],
+  accreditationVerificationMethod: "",
   ndaAccepted: false,
   ndaSignatureMethod: "",
   ndaTypedName: "",
@@ -886,7 +888,7 @@ export default function LPOnboardClient() {
             ) : step === 7 ? (
               /* Step 7: Document Signing */
               <div className="min-h-[300px]">
-                <SequentialSigningFlow
+                <FundRoomSignFlow
                   onComplete={handleSigningComplete}
                   fundId={fundContext?.fundId || undefined}
                 />

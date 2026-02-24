@@ -2,54 +2,28 @@ import { NextApiRequest, NextApiResponse } from "next";
 
 import { z } from "zod";
 
-import { EU_COUNTRY_CODES, VIDEO_EVENT_TYPES } from "@/lib/constants";
+import { VIDEO_EVENT_TYPES } from "@/lib/constants";
 import { reportError } from "@/lib/error";
 import { newId } from "@/lib/id-helper";
 import prisma from "@/lib/prisma";
-import { recordVideoView } from "@/lib/tinybird";
-import { Geo } from "@/lib/types";
-import { capitalize, getDomainWithoutWWW, log } from "@/lib/utils";
-import { LOCALHOST_GEO_DATA, getGeoData } from "@/lib/utils/geo";
-import { getIpAddress } from "@/lib/utils/ip";
-import { userAgentFromString } from "@/lib/utils/user-agent";
+import { log } from "@/lib/utils";
 import { apiRateLimiter } from "@/lib/security/rate-limiter";
+import { publishServerEvent } from "@/lib/tracking/server-events";
 
 const bodyValidation = z.object({
-  timestamp: z.string(),
-  id: z.string(),
-  link_id: z.string(),
-  document_id: z.string(),
-  view_id: z.string(),
-  dataroom_id: z.string().nullable(),
-  version_number: z.number(),
-  event_type: z.enum(VIDEO_EVENT_TYPES),
-  start_time: z.number(),
-  end_time: z.number(),
-  playback_rate: z.number().transform((rate) => Math.round(rate * 100)), // 1.5 -> 150
-  volume: z.number().transform((vol) => Math.round(vol * 100)), // 0.7 -> 70
-  is_muted: z.number(),
-  is_focused: z.number(),
-  is_fullscreen: z.number(),
-  country: z.string().optional(),
-  city: z.string().optional(),
-  region: z.string().optional(),
-  latitude: z.string().optional(),
-  longitude: z.string().optional(),
-  ua: z.string().optional(),
-  browser: z.string().optional(),
-  browser_version: z.string().optional(),
-  engine: z.string().optional(),
-  engine_version: z.string().optional(),
-  os: z.string().optional(),
-  os_version: z.string().optional(),
-  device: z.string().optional(),
-  device_vendor: z.string().optional(),
-  device_model: z.string().optional(),
-  cpu_architecture: z.string().optional(),
-  bot: z.boolean().optional(),
-  referer: z.string().optional(),
-  referer_url: z.string().optional(),
-  ip_address: z.string().nullable(),
+  linkId: z.string(),
+  documentId: z.string(),
+  viewId: z.string(),
+  dataroomId: z.string().nullable().optional(),
+  versionNumber: z.number().optional(),
+  eventType: z.enum(VIDEO_EVENT_TYPES),
+  startTime: z.number(),
+  endTime: z.number().optional(),
+  playbackRate: z.number().optional(),
+  volume: z.number().optional(),
+  isMuted: z.boolean().or(z.number()).optional(),
+  isFocused: z.boolean().or(z.number()).optional(),
+  isFullscreen: z.boolean().or(z.number()).optional(),
 });
 
 export default async function handler(
@@ -63,56 +37,15 @@ export default async function handler(
   const allowed = await apiRateLimiter(req, res);
   if (!allowed) return;
 
-  const geo: Geo =
-    process.env.VERCEL === "1" ? getGeoData(req.headers) : LOCALHOST_GEO_DATA;
-  const isEuCountry = geo.country && EU_COUNTRY_CODES.includes(geo.country);
-
-  // Get user agent data
-  const ua = userAgentFromString(req.headers["user-agent"]);
-  const referer = req.headers.referer;
-  const refererDomain = referer ? getDomainWithoutWWW(referer) : "(direct)";
-
-  const ipAddress = getIpAddress(req.headers);
-
-  const videoViewId = newId("videoView");
-
-  const {
-    timestamp,
-    linkId,
-    documentId,
-    viewId,
-    dataroomId,
-    versionNumber,
-    startTime,
-    endTime,
-    playbackRate,
-    volume,
-    isMuted,
-    isFocused,
-    isFullscreen,
-    eventType,
-  } = req.body as {
-    timestamp: string;
-    linkId: string;
-    documentId: string;
-    viewId: string;
-    dataroomId: string | null;
-    versionNumber: number;
-    startTime: number;
-    endTime: number | undefined;
-    playbackRate: number;
-    volume: number;
-    isMuted: number;
-    isFocused: number;
-    isFullscreen: number;
-    eventType: string;
-  };
-
-  // Validate that the view exists and belongs to the specified link
-  if (!viewId || !linkId) {
+  const result = bodyValidation.safeParse(req.body);
+  if (!result.success) {
     return res.status(400).json({ error: "Invalid request body" });
   }
 
+  const { linkId, documentId, viewId, dataroomId, versionNumber, eventType, startTime, endTime, playbackRate, volume, isMuted, isFocused, isFullscreen } =
+    result.data;
+
+  // Validate that the view exists and belongs to the specified link
   try {
     const view = await prisma.view.findUnique({
       where: { id: viewId, linkId },
@@ -126,63 +59,31 @@ export default async function handler(
     return res.status(400).json({ error: "Invalid view" });
   }
 
-  const videoViewObject = {
-    timestamp: timestamp,
-    id: videoViewId,
-    link_id: linkId,
-    document_id: documentId,
-    view_id: viewId,
-    dataroom_id: dataroomId || null,
-    version_number: versionNumber || 1,
-    event_type: eventType,
-    start_time: startTime,
-    end_time: endTime,
-    playback_rate: playbackRate,
-    volume,
-    is_muted: isMuted ? 1 : 0,
-    is_focused: isFocused ? 1 : 0,
-    is_fullscreen: isFullscreen ? 1 : 0,
-    country: geo?.country || "Unknown",
-    city: geo?.city || "Unknown",
-    region: geo?.region || "Unknown",
-    latitude: geo?.latitude || "Unknown",
-    longitude: geo?.longitude || "Unknown",
-    ua: ua.ua || "Unknown",
-    browser: ua.browser.name || "Unknown",
-    browser_version: ua.browser.version || "Unknown",
-    engine: ua.engine.name || "Unknown",
-    engine_version: ua.engine.version || "Unknown",
-    os: ua.os.name || "Unknown",
-    os_version: ua.os.version || "Unknown",
-    device: ua.device.type ? capitalize(ua.device.type) : "Desktop",
-    device_vendor: ua.device.vendor || "Unknown",
-    device_model: ua.device.model || "Unknown",
-    cpu_architecture: ua.cpu?.architecture || "Unknown",
-    bot: ua.isBot,
-    referer: refererDomain,
-    referer_url: referer || "(direct)",
-    ip_address:
-      // only record IP if it's a valid IP and not from a EU country
-      typeof ipAddress === "string" &&
-      ipAddress.trim().length > 0 &&
-      !isEuCountry
-        ? ipAddress
-        : null,
-  };
-
-  const result = bodyValidation.safeParse(videoViewObject);
-  if (!result.success) {
-    return res
-      .status(400)
-      .json({ error: "Invalid request body" });
-  }
+  const videoViewId = newId("videoView");
 
   try {
-    await recordVideoView(result.data);
+    // Track video view event via PostHog (fire-and-forget)
+    publishServerEvent("video_view_event", {
+      videoViewId,
+      linkId,
+      documentId,
+      viewId,
+      dataroomId: dataroomId || undefined,
+      versionNumber: versionNumber || 1,
+      eventType,
+      startTime,
+      endTime: endTime || 0,
+      playbackRate: playbackRate || 1,
+      volume: volume || 1,
+      isMuted: isMuted ? 1 : 0,
+      isFocused: isFocused ? 1 : 0,
+      isFullscreen: isFullscreen ? 1 : 0,
+    }).catch((e) => reportError(e as Error));
+
     res.status(200).json({ message: "Video view recorded" });
   } catch (error) {
     log({
-      message: `Failed to record video view (tinybird) for ${linkId}. \n\n ${error}`,
+      message: `Failed to record video view for ${linkId}. \n\n ${error}`,
       type: "error",
       mention: true,
     });

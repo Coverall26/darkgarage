@@ -205,7 +205,7 @@ export async function transitionInvestorStage(params: {
 
   await prisma.investor.update({
     where: { id: investorId },
-    data: updateData as any,
+    data: updateData as Record<string, unknown> & { fundData: Record<string, unknown> },
   });
 
   return { success: true };
@@ -400,7 +400,7 @@ export async function confirmWireReceived(params: {
           ? amount
           : investment.commitmentAmount,
         fundedDate: new Date(),
-      } as any,
+      },
     });
   }
 

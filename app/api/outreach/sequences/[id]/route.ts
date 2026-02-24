@@ -13,6 +13,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { resolveCrmRole, hasCrmPermission } from "@/lib/auth/crm-roles";
+import { validateBody } from "@/lib/middleware/validate";
+import { SequenceUpdateSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -162,11 +164,14 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, SequenceUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
     const data: Record<string, unknown> = {};
 
     if (body.name !== undefined) {
-      if (typeof body.name !== "string" || !body.name.trim()) {
+      if (!body.name.trim()) {
         return NextResponse.json(
           { error: "Sequence name cannot be empty" },
           { status: 400 },
@@ -180,7 +185,7 @@ export async function PATCH(
     }
 
     if (body.isActive !== undefined) {
-      data.isActive = Boolean(body.isActive);
+      data.isActive = body.isActive;
 
       // If deactivating, pause all active enrollments
       if (!body.isActive) {

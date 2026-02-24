@@ -2,7 +2,9 @@
  * One-time data sync from Supabase (primary) to Replit Postgres (backup).
  *
  * Usage:
- *   DATABASE_URL=<supabase_url> REPLIT_DATABASE_URL=<replit_url> npx tsx scripts/sync-backup-db.ts
+ *   SUPABASE_DATABASE_URL=<supabase_url> REPLIT_DATABASE_URL=<replit_url> npx tsx scripts/sync-backup-db.ts
+ *
+ * Reads SUPABASE_DATABASE_URL first, falls back to DATABASE_URL (same priority as lib/prisma.ts).
  *
  * This script:
  * 1. Connects to both databases
@@ -47,11 +49,11 @@ const TABLE_ORDER = [
 ];
 
 async function main() {
-  const primaryUrl = process.env.DATABASE_URL;
+  const primaryUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
   const backupUrl = process.env.REPLIT_DATABASE_URL;
 
   if (!primaryUrl || !backupUrl) {
-    console.error("Both DATABASE_URL and REPLIT_DATABASE_URL must be set");
+    console.error("Both SUPABASE_DATABASE_URL (or DATABASE_URL) and REPLIT_DATABASE_URL must be set");
     process.exit(1);
   }
 

@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { SignatureFieldsSchema, SignatureFieldsInput } from "@/lib/validations/teams";
+import { SignatureFieldType } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
@@ -21,7 +24,7 @@ export default async function handler(
   const userTeam = await prisma.userTeam.findFirst({
     where: {
       teamId,
-      userId: (session.user as any).id,
+      userId: session.user.id,
     },
   });
 
@@ -43,7 +46,11 @@ async function handlePut(
   documentId: string
 ) {
   try {
-    const { fields } = req.body;
+    const parsed = validateBodyPagesRouter(req.body, SignatureFieldsSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { fields } = parsed.data;
 
     const document = await prisma.signatureDocument.findFirst({
       where: { id: documentId, teamId },
@@ -65,10 +72,10 @@ async function handlePut(
 
     if (fields && fields.length > 0) {
       await prisma.signatureField.createMany({
-        data: fields.map((field: any) => ({
+        data: fields.map((field: SignatureFieldsInput["fields"][number]) => ({
           documentId,
           recipientId: field.recipientId || null,
-          type: field.type,
+          type: field.type as SignatureFieldType,
           pageNumber: field.pageNumber,
           x: field.x,
           y: field.y,

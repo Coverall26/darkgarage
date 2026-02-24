@@ -224,7 +224,7 @@ delivered@resend.dev    # Always succeeds (Resend sandbox address)
 
 ### Environment Variables
 ```bash
-STORAGE_PROVIDER=local                # local | s3 | r2 | vercel | replit
+STORAGE_PROVIDER=local                # local | s3 | r2 | vercel
 STORAGE_BUCKET=fundroom-documents     # Bucket name (S3/R2)
 STORAGE_REGION=us-east-1              # AWS region
 STORAGE_ACCESS_KEY_ID=                # AWS access key
@@ -242,7 +242,6 @@ NEXT_PUBLIC_UPLOAD_TRANSPORT=local    # Client-side transport
 | AWS S3 | `s3` | Self-hosted production |
 | Cloudflare R2 | `r2` | Edge-optimized production |
 | Vercel Blob | `vercel` | Vercel deployments (current production) |
-| Replit Object Storage | `replit` | Replit development fallback |
 
 ### Key Files
 | File | Purpose |
@@ -255,32 +254,32 @@ NEXT_PUBLIC_UPLOAD_TRANSPORT=local    # Client-side transport
 
 ---
 
-## 6. Tinybird (Server Analytics)
+## 6. PostHog (Server Analytics)
 
-**Status:** Production. Fire-and-forget event publishing (non-blocking).
+**Status:** Production. Fire-and-forget event publishing (non-blocking). PostHog handles both server-side and client-side analytics.
 
 ### Environment Variables
 ```bash
-TINYBIRD_TOKEN=                       # API token
-TINYBIRD_HOST=https://api.us-west-2.aws.tinybird.co  # Default host
+POSTHOG_SERVER_KEY=                   # Server-side API key (secret, never exposed to client)
+POSTHOG_HOST=https://us.i.posthog.com  # PostHog API host (US region default)
+NEXT_PUBLIC_POSTHOG_KEY=              # Client-side project API key (public)
 ```
 
-### Datasources
-| Datasource | Purpose |
-|------------|---------|
-| `page_views__v3` | Document page view analytics |
-| `webhook_events__v1` | Webhook delivery tracking |
-| `video_views__v1` | Video playback events |
-| `click_events__v1` | Document link clicks |
-| `signature_events__v1` | E-signature audit events |
-| `pm_click_events__v1` | Marketing click tracking |
+### Event Types
+| Event | Purpose |
+|-------|---------|
+| `page_view` | Document page view analytics |
+| `webhook_event` | Webhook delivery tracking |
+| `video_view` | Video playback events |
+| `click_event` | Document link clicks |
+| `signature_event` | E-signature audit events |
+| `marketing_click` | Marketing click tracking |
 
 ### Key Files
 | File | Purpose |
 |------|---------|
-| `lib/tinybird/publish.ts` | Event publishing methods |
-| `lib/tinybird/pipes.ts` | Pre-built analytics query pipes |
-| `lib/tinybird/README.md` | Setup guide for new pipes |
+| `lib/tracking/server-events.ts` | Server-side event publishing methods |
+| `lib/posthog.ts` | PostHog client configuration |
 
 ---
 

@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { getViewUserAgent } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 
 export default async function handle(
@@ -54,15 +53,23 @@ export default async function handle(
       if (team.plan.includes("free")) {
         return res.status(403).end("Forbidden");
       }
-      const userAgent = await getViewUserAgent({
-        viewId: viewId,
+      // Query PageView for user agent data
+      const pageView = await prisma.pageView.findFirst({
+        where: { viewId: viewId },
+        select: {
+          country: true,
+          city: true,
+          browser: true,
+          os: true,
+          device: true,
+        },
       });
 
-      const userAgentData = userAgent.data[0];
-
-      if (!userAgentData) {
+      if (!pageView) {
         return res.status(404).end("No user agent data found");
       }
+
+      const userAgentData = pageView;
 
       // Include country and city for business and datarooms plans
       if (team.plan.includes("business") || team.plan.includes("datarooms")) {

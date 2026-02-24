@@ -42,7 +42,7 @@ export default function DownloadDataroomButton({
             return "Dataroom downloaded successfully.";
           },
           error: (error) => {
-            console.log(error);
+            console.error(error);
             return (
               error.message || "An error occurred while downloading dataroom."
             );

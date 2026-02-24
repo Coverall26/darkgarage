@@ -4,8 +4,10 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
+import { QuickAddEmailsSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -23,11 +25,13 @@ export default async function handle(
       id: string;
     };
 
-    const { emails } = req.body as { emails: string[] };
-
-    if (!emails || !Array.isArray(emails) || emails.length === 0) {
-      return res.status(400).json({ error: "No emails provided" });
+    const parsed = validateBodyPagesRouter(req.body, QuickAddEmailsSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
     }
+    const { emails } = parsed.data;
 
     try {
       const teamAccess = await prisma.userTeam.findUnique({

@@ -591,8 +591,7 @@ describe("GET /api/teams/[teamId]/signature-audit/export", () => {
       { id: "doc-1", title: "Subscription Agreement" },
     ]);
 
-    // @ts-ignore - signatureAuditLog mock
-    (prisma.signatureAuditLog as any) = {
+    (prisma as any).signatureAuditLog = {
       findMany: jest.fn().mockResolvedValue(mockSignatureAuditLogs),
     };
   });

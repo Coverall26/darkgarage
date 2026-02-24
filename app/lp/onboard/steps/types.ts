@@ -42,6 +42,9 @@ export interface FormData {
   noThirdPartyFinancing: boolean;
   sourceOfFunds: string;
   occupation: string;
+  // Step 4: 506(c) verification document uploads
+  accreditationDocIds: string[];
+  accreditationVerificationMethod: "SELF_CERTIFICATION" | "DOCUMENT_UPLOAD" | "";
   // Step 5: NDA
   ndaAccepted: boolean;
   ndaSignatureMethod: "TYPED" | "DRAWN" | "";

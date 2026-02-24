@@ -7,14 +7,6 @@ import { getServerSession } from "next-auth/next";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import {
-  getTotalAvgPageDuration,
-  getTotalDocumentDuration,
-} from "@/lib/tinybird";
-import {
-  getVideoEventsByDocument,
-  getViewCompletionStats,
-} from "@/lib/tinybird/pipes";
-import {
   getTotalAvgPageDurationPg,
   getTotalDocumentDurationPg,
   getViewCompletionStatsPg,
@@ -141,92 +133,29 @@ export default async function handle(
 
       const excludedViewIdsList = allExcludedViews.map((view) => view.id);
       
-      let duration: { data: { pageNumber: string; versionNumber: number; avg_duration: number }[] };
-      let totalDocumentDuration: { data: { sum_duration: number }[] };
-
-      if (process.env.TINYBIRD_TOKEN) {
-        [duration, totalDocumentDuration] = await Promise.all([
-          getTotalAvgPageDuration({
-            documentId: docId,
-            excludedLinkIds: "",
-            excludedViewIds: excludedViewIdsList.join(","),
-            since: 0,
-          }),
-          getTotalDocumentDuration({
-            documentId: docId,
-            excludedLinkIds: "",
-            excludedViewIds: excludedViewIdsList.join(","),
-            since: 0,
-          }),
-        ]);
-      } else {
-        [duration, totalDocumentDuration] = await Promise.all([
-          getTotalAvgPageDurationPg({
-            documentId: docId,
-            excludedViewIds: excludedViewIdsList,
-          }),
-          getTotalDocumentDurationPg({
-            documentId: docId,
-            excludedViewIds: excludedViewIdsList,
-          }),
-        ]);
-      }
+      const [duration, totalDocumentDuration] = await Promise.all([
+        getTotalAvgPageDurationPg({
+          documentId: docId,
+          excludedViewIds: excludedViewIdsList,
+        }),
+        getTotalDocumentDurationPg({
+          documentId: docId,
+          excludedViewIds: excludedViewIdsList,
+        }),
+      ]);
 
       // Calculate average completion rate for all filtered views
       let avgCompletionRate = 0;
       if (filteredViews.length > 0) {
         if (document.type === "video") {
-          // For video documents, calculate based on unique watch time
-          const videoEvents = await getVideoEventsByDocument({
-            document_id: docId,
-          });
-
-          const completionRates = await Promise.all(
-            filteredViews.map(async (view) => {
-              const viewEvents =
-                videoEvents?.data.filter(
-                  (event: { view_id: string; event_type: string; start_time: number; end_time: number }) =>
-                    event.view_id === view.id &&
-                    ["played", "muted", "unmuted", "rate_changed"].includes(
-                      event.event_type,
-                    ) &&
-                    event.end_time > event.start_time &&
-                    event.end_time - event.start_time >= 1,
-                ) || [];
-
-              const uniqueTimestamps = new Set<number>();
-              viewEvents.forEach((event: { start_time: number; end_time: number }) => {
-                for (let t = event.start_time; t < event.end_time; t++) {
-                  uniqueTimestamps.add(Math.floor(t));
-                }
-              });
-
-              const videoLength = document.versions[0]?.length || 0;
-              return videoLength > 0
-                ? Math.min(100, (uniqueTimestamps.size / videoLength) * 100)
-                : 0;
-            }),
-          );
-
-          avgCompletionRate =
-            completionRates.reduce((sum, rate) => sum + rate, 0) /
-            completionRates.length;
+          // Video events have no Prisma model - return 0
+          avgCompletionRate = 0;
         } else {
           // For document type, calculate based on pages viewed
-          let completionStats: { data: { viewId: string; versionNumber: number; pages_viewed: number }[] };
-          
-          if (process.env.TINYBIRD_TOKEN) {
-            completionStats = await getViewCompletionStats({
-              documentId: docId,
-              excludedViewIds: excludedViewIdsList.join(","),
-              since: 0,
-            });
-          } else {
-            completionStats = await getViewCompletionStatsPg({
-              documentId: docId,
-              excludedViewIds: excludedViewIdsList,
-            });
-          }
+          const completionStats = await getViewCompletionStatsPg({
+            documentId: docId,
+            excludedViewIds: excludedViewIdsList,
+          });
 
           // Build lookup map for O(1) access: viewId -> { versionNumber, pages_viewed }
           const statsMap = new Map(

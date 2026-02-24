@@ -20,7 +20,7 @@ npx prisma migrate deploy
 npx ts-node prisma/seed-bermuda.ts
 
 # 5. (Optional) Create platform admin with password
-npx ts-node prisma/seed-platform-admin.ts --set-password YourPassword123
+npx ts-node prisma/seed-platform-admin.ts --set-password [your-secure-password-here]
 
 # 6. Start dev server
 npm run dev -- -p 5000 -H 0.0.0.0
@@ -30,7 +30,7 @@ npm run dev -- -p 5000 -H 0.0.0.0
 
 ## 1. Database Architecture
 
-FundRoom.ai uses a **dual-database architecture**: Supabase PostgreSQL as the primary database with an optional Replit Postgres hot backup.
+FundRoom.ai uses a **dual-database architecture**: Supabase PostgreSQL as the primary database with an optional PostgreSQL hot backup.
 
 ```
 App Request → Prisma Client (SUPABASE_DATABASE_URL)
@@ -39,7 +39,7 @@ App Request → Prisma Client (SUPABASE_DATABASE_URL)
                 ↓ (backup-write extension)
            Queue async backup (if BACKUP_DB_ENABLED=true)
                 ↓ (100ms → 500ms → 2000ms retries)
-           Upsert → Replit Postgres (backup)
+           Upsert → Backup PostgreSQL
 ```
 
 ### Environment Variables
@@ -65,7 +65,7 @@ postgresql://postgres.[project]:[password]@aws-0-us-east-1.pooler.supabase.com:6
 
 | Port | Mode | Best For |
 |------|------|----------|
-| 5432 | Session pooler | Interactive dev sessions, Replit |
+| 5432 | Session pooler | Interactive dev sessions, local development |
 | 6543 | Transaction pooler | Vercel serverless, high-concurrency |
 
 ---
@@ -211,7 +211,7 @@ npx prisma db push
 npx prisma migrate deploy
 ```
 
-**To Replit (backup):**
+**To backup database (if enabled):**
 ```bash
 DATABASE_URL=$REPLIT_DATABASE_URL npx prisma migrate deploy
 ```
@@ -261,8 +261,8 @@ npx ts-node prisma/seed-bermuda.ts --dry-run     # Preview without writing
 | Team | Bermuda Franchise Fund I |
 | Fund | $9.55M target, 2.5% mgmt fee, 20% carry, 8% hurdle, European waterfall |
 | GP Admin | `rciesco@fundroom.ai` (platform admin) |
-| GP User | `joe@bermudafranchisegroup.com` / `FundRoom2026!` |
-| LP User | `demo-investor@example.com` / `Investor2026!` |
+| GP User | `joe@bermudafranchisegroup.com` / (see `GP_SEED_PASSWORD` env var) |
+| LP User | `demo-investor@example.com` / (see `LP_SEED_PASSWORD` env var) |
 | Pricing Tiers | 6 tiers (90 total units) |
 | Signature Docs | NDA + Subscription Agreement (requiredForOnboarding) |
 | Wire Instructions | Fund wire transfer details |
@@ -276,7 +276,7 @@ Creates or updates the platform admin user.
 
 ```bash
 npx ts-node prisma/seed-platform-admin.ts
-npx ts-node prisma/seed-platform-admin.ts --set-password MyPassword123
+npx ts-node prisma/seed-platform-admin.ts --set-password "$ADMIN_TEMP_PASSWORD"
 ```
 
 **Creates:**
@@ -458,7 +458,7 @@ npx prisma generate
 ```
 Must run after any `schema.prisma` modification.
 
-### Connection Timeout from Replit
+### Connection Timeout in Development
 Switch from transaction pooler (port 6543) to session pooler (port 5432) in your connection string.
 
 ### Verify Schema is Valid

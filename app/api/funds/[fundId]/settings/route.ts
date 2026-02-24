@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundSettingsUpdateSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -153,7 +155,9 @@ export async function PATCH(
   }
 
   try {
-    const body = await req.json();
+    const parsed = await validateBody(req, FundSettingsUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
     const updateData: Record<string, unknown> = {};
 
     // Boolean toggles
@@ -167,87 +171,30 @@ export async function PATCH(
     ] as const;
 
     for (const field of booleanFields) {
-      if (typeof body[field] === "boolean") {
+      if (body[field] !== undefined) {
         updateData[field] = body[field];
       }
     }
 
-    // String fields with validation
-    if (body.callFrequency && ["AS_NEEDED", "MONTHLY", "QUARTERLY", "SEMI_ANNUAL", "ANNUAL"].includes(body.callFrequency)) {
-      updateData.callFrequency = body.callFrequency;
-    }
+    // String enum fields (already validated by Zod)
+    if (body.callFrequency !== undefined) updateData.callFrequency = body.callFrequency;
+    if (body.waterfallType !== undefined) updateData.waterfallType = body.waterfallType;
+    if (body.currency !== undefined) updateData.currency = body.currency;
+    if (body.preferredReturnMethod !== undefined) updateData.preferredReturnMethod = body.preferredReturnMethod;
 
-    if (body.waterfallType && ["EUROPEAN", "AMERICAN", "DEAL_BY_DEAL"].includes(body.waterfallType)) {
-      updateData.waterfallType = body.waterfallType;
-    }
+    // Numeric fields (already coerced and range-checked by Zod)
+    if (body.minimumInvestment !== undefined) updateData.minimumInvestment = body.minimumInvestment;
+    if (body.capitalCallThreshold !== undefined) updateData.capitalCallThreshold = body.capitalCallThreshold;
+    if (body.termYears !== undefined) updateData.termYears = body.termYears;
+    if (body.extensionYears !== undefined) updateData.extensionYears = body.extensionYears;
+    if (body.investmentPeriodYears !== undefined) updateData.investmentPeriodYears = body.investmentPeriodYears;
+    if (body.gpCommitmentAmount !== undefined) updateData.gpCommitmentAmount = body.gpCommitmentAmount;
 
-    if (body.currency && typeof body.currency === "string" && body.currency.length <= 5) {
-      updateData.currency = body.currency;
-    }
-
-    // Numeric fields
-    if (body.minimumInvestment !== undefined) {
-      const val = parseFloat(body.minimumInvestment);
-      if (!isNaN(val) && val >= 0 && val <= 100000000000) {
-        updateData.minimumInvestment = val;
-      }
-    }
-
-    if (body.capitalCallThreshold !== undefined) {
-      updateData.capitalCallThreshold = body.capitalCallThreshold
-        ? parseFloat(body.capitalCallThreshold)
-        : null;
-    }
-
-    if (body.termYears !== undefined) {
-      const val = parseInt(body.termYears, 10);
-      if (!isNaN(val) && val >= 0 && val <= 99) {
-        updateData.termYears = val;
-      }
-    }
-
-    if (body.extensionYears !== undefined) {
-      const val = parseInt(body.extensionYears, 10);
-      if (!isNaN(val) && val >= 0 && val <= 10) {
-        updateData.extensionYears = val;
-      }
-    }
-
-    if (body.investmentPeriodYears !== undefined) {
-      const val = parseInt(body.investmentPeriodYears, 10);
-      if (!isNaN(val) && val >= 0 && val <= 30) {
-        updateData.investmentPeriodYears = val;
-      }
-    }
-
-    if (body.preferredReturnMethod && ["SIMPLE", "COMPOUND", "NONE"].includes(body.preferredReturnMethod)) {
-      updateData.preferredReturnMethod = body.preferredReturnMethod;
-    }
-
-    // GP Commitment Amount
-    if (body.gpCommitmentAmount !== undefined) {
-      const val = parseFloat(body.gpCommitmentAmount);
-      if (!isNaN(val) && val >= 0 && val <= 100000000000) {
-        updateData.gpCommitmentAmount = val;
-      }
-    }
-
-    // Percentage fields (client sends display value, stored as decimal)
-    const pctFields = [
-      { key: "managementFeePct", max: 100 },
-      { key: "carryPct", max: 100 },
-      { key: "hurdleRate", max: 100 },
-      { key: "gpCommitmentPct", max: 100 },
-    ] as const;
-
-    for (const { key, max } of pctFields) {
-      if (body[key] !== undefined && body[key] !== null) {
-        const val = parseFloat(body[key]);
-        if (!isNaN(val) && val >= 0 && val <= max) {
-          updateData[key] = val / 100; // 2.00 → 0.02
-        }
-      }
-    }
+    // Percentage fields — client sends display value (e.g. 2.5), stored as decimal (0.025)
+    if (body.managementFeePct != null) updateData.managementFeePct = body.managementFeePct / 100;
+    if (body.carryPct != null) updateData.carryPct = body.carryPct / 100;
+    if (body.hurdleRate != null) updateData.hurdleRate = body.hurdleRate / 100;
+    if (body.gpCommitmentPct != null) updateData.gpCommitmentPct = body.gpCommitmentPct / 100;
 
     // Wire instructions (JSON)
     if (body.wireInstructions !== undefined) {
@@ -257,7 +204,7 @@ export async function PATCH(
     }
 
     // Feature flags merge (LP visibility toggles stored in featureFlags JSON)
-    if (body.featureFlags !== undefined && typeof body.featureFlags === "object") {
+    if (body.featureFlags !== undefined) {
       const existing = (fund.featureFlags as Record<string, unknown>) || {};
       updateData.featureFlags = { ...existing, ...body.featureFlags };
     }

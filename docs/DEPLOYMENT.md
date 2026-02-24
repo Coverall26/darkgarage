@@ -41,11 +41,11 @@ FundRoom deploys to **Vercel** with a **Supabase** PostgreSQL database. This gui
 |-----------|----------|---------|
 | Hosting | Vercel | Project `darkroom`, team `bffi`, Node 22.x |
 | Database (Primary) | Supabase | PostgreSQL, session pooler port 5432 |
-| Database (Backup) | Replit Postgres | Optional, `BACKUP_DB_ENABLED=false` by default |
+| Database (Backup) | PostgreSQL | Optional backup via `BACKUP_DB_ENABLED` (disabled by default) |
 | Storage | AWS S3 or Vercel Blob | `STORAGE_PROVIDER=vercel` on Vercel |
 | Email | Resend | fundroom.ai verified domain |
 | Monitoring | Rollbar | Server + client error tracking |
-| Analytics | Tinybird | Server-side events, US West 2 |
+| Analytics | PostHog | Server-side + client-side events |
 
 ---
 
@@ -130,8 +130,8 @@ FundRoom deploys to **Vercel** with a **Supabase** PostgreSQL database. This gui
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TINYBIRD_TOKEN` | — | Server analytics |
-| `TINYBIRD_HOST` | `https://api.us-west-2.tinybird.co` | Tinybird region |
+| `POSTHOG_SERVER_KEY` | — | Server analytics |
+| `POSTHOG_HOST` | `https://us.i.posthog.com` | PostHog API host |
 | `ROLLBAR_READ_TOKEN` | — | Error reading |
 | `PERSONA_API_KEY` | — | KYC verification |
 | `PERSONA_WEBHOOK_SECRET` | — | KYC webhook validation |
@@ -411,7 +411,7 @@ This validates 30+ items including:
 |---------|-----------|---------|
 | Rollbar | rollbar.com (FundRoom project) | Error tracking + alerting |
 | Vercel Analytics | vercel.com/dashboard | Request metrics |
-| Tinybird | tinybird.co (fundroomia_workspace) | Server analytics events |
+| PostHog | posthog.com | Server + client analytics events |
 | PostHog | posthog.com (when enabled) | Client-side analytics |
 
 **Rollbar Alert Rules (configure in Rollbar dashboard):**

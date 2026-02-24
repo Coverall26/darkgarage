@@ -6,10 +6,56 @@ All notable changes to FundRoom are documented here. Format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+- **Deep Code Review Sprint** (Feb 24, 2026) — Comprehensive multi-session code review covering 13 workstreams:
+  - **Auth hardening**: Added auth checks to 6 unprotected LP API routes (fund-context, fund-details, wire-instructions, signing-documents, subscription-status, bank/status)
+  - **Dead code removal**: Deleted 3 deprecated files (`.deprecated.ts` suffixed files)
+  - **Console.log cleanup**: Removed 39 debug console.log statements from production API routes
+  - **TS suppression fixes**: Regenerated Prisma client, fixed 5 `@ts-ignore` suppressions with proper type casts
+  - **Zod validation**: Added input validation schemas to 10 critical routes (wire/confirm, documents/upload, signatures/capture, approve-with-changes, request-changes, lp/register, lp/subscribe, staged-commitment, admin-login, setup-admin)
+  - **Multi-tenant isolation audit**: Verified org_id scoping across all critical routes
+  - **`any` type reduction**: Replaced `any` types in 3 critical files (tranches.ts, advance-on-doc-approval.ts, utils.ts) with proper Prisma types
+  - **Large file splitting**: Split 1000+ line components into sub-components
+  - **TypeScript errors**: Fixed 10 errors (6 in subscriptions/create.ts from Zod transform, 4 pre-existing in annotate-document.ts, selection-tree.tsx, sidebar-folders.tsx, links-table.tsx)
+  - **Test fixes**: Fixed 22 failing tests across 4 suites (crm-billing mock gaps, wire-confirm Zod assertions, production-smoke/verification health endpoint mocks)
+  - **Zero TypeScript errors** confirmed via `npx tsc --noEmit`
+  - **192 test suites / 5,444 tests** all passing
+
 ### Added
-- SECURITY.md, CONTRIBUTING.md, CHANGELOG.md (root-level)
-- docs/API_REFERENCE.md, docs/DEPLOYMENT.md, docs/ARCHITECTURE.md
-- docs/SEC_COMPLIANCE.md, docs/LP_ONBOARDING_FLOW.md
+- **Admin Auth Edge Middleware** (`lib/middleware/admin-auth.ts`) — Edge-compatible JWT session validation for `/admin/*` and `/api/admin/*` routes. Defense-in-depth layer with LP blocking, unauthenticated redirect, user context headers. 30+ tests
+- **Edge Auth Expansion to ALL API Routes** (`lib/middleware/edge-auth.ts`, `lib/middleware/route-config.ts`, `lib/middleware/cron-auth.ts`) — Expanded edge-level authentication from admin-only to ALL API routes. Centralized route classification (PUBLIC/CRON/AUTHENTICATED/TEAM_SCOPED/ADMIN), JWT validation for all non-public routes, cron secret verification, user context header injection (`x-middleware-user-id/email/role`). `getMiddlewareUser()` helper for downstream route handlers
+- **Secrets Audit Report** (`docs/SECRETS_AUDIT.md`) — Comprehensive secrets scan: 10 pattern checks (Stripe keys, Resend keys, webhook secrets, bearer tokens, hardcoded passwords, private keys, JWT tokens, API keys, committed .env files, encryption keys). Result: PASS — no exposed secrets. Encryption architecture table documenting all 7 encryption purposes and env vars
+- **Encryption Audit Report** (`docs/ENCRYPTION_AUDIT.md`) — Full audit of all 9 encryption implementations: AES-256-GCM for tax IDs/wire instructions/Plaid tokens/MFA/signatures, SHA-256 checksums, HMAC verification. Verification checklist for 14 sensitive data types. Documents required env vars for production encryption
+- **Proprietary LICENSE file** — FundRoom AI, Inc. proprietary software license. All rights reserved. Contact: legal@fundroom.ai
+- **Document Template HTML Merge Field System** — 23-field merge engine (`lib/documents/merge-fields.ts`), template renderer, entity auto-fill for 8 entity types, default NDA/Subscription Agreement HTML templates, DocumentTemplate Prisma model + migration + seed data. 28 tests
+- **Funding Round / Tranche Configuration** — FundingRound Prisma model with PLANNED/ACTIVE/COMPLETED lifecycle, CRUD APIs, FundingRoundsConfig management UI, StartupRoundsChart visualization, FundingStructurePreview inline chart, setup wizard integration for both STARTUP (rounds) and GP_FUND (pricing tiers) modes. 66 tests across 4 test files
+- **Documentation Consolidation** — Archived 28 session summaries to `docs/archive/sessions/`, cleaned CLAUDE.md reference section (removed 14 stale file references), updated CONTRIBUTING.md/SECURITY.md/CHANGELOG.md
+
+### Changed
+- **LP signing consolidated to FundRoomSign** — Replaced SequentialSigningFlow with FundRoomSignFlow wrapper (`components/esign/FundRoomSignFlow.tsx`) in LP onboarding. Pre-fetches sign data for all unsigned docs in parallel via `Promise.allSettled`. Public signing page kept separate (single-doc, decline support, external signer branding)
+- **proxy.ts refactored** — API section now uses `enforceEdgeAuth()` from centralized edge-auth module instead of inline admin-only checks. Route classification delegated to `classifyRoute()`. Cron routes verified via `verifyCronAuth()`. All authenticated routes receive user context headers
+- `.env.example` updated with ~20 new env vars across 10+ categories (CRON_SECRET, GP_SEED_PASSWORD, LP_SEED_PASSWORD, ADMIN_SEED_PASSWORD, SVIX_SECRET, MFA_ENCRYPTION_KEY, etc.)
+- Demo credentials removed from CLAUDE.md — now reference env vars only (GP_SEED_PASSWORD, LP_SEED_PASSWORD, ADMIN_TEMP_PASSWORD)
+- `package.json` — set `"license": "PROPRIETARY"` field
+- CLAUDE.md REFERENCE DOCUMENTS section condensed from ~65 lines to ~20 lines
+- CLAUDE.md MANDATORY DOCUMENTATION UPDATE PROCEDURE: removed stale file references
+- CONTRIBUTING.md: updated test counts, fixed stale doc reference
+- SECURITY.md: updated test counts
+- README.md: full enterprise SaaS rewrite (completed prior session)
+
+### Fixed
+- **Wire instruction encryption gap** (P0 security fix) — `lib/wire-transfer/instructions.ts` stored account/routing numbers as plaintext while setup wizard encrypted them. Added `encryptTaxId()` on write and `decryptTaxId()` on read for consistent AES-256-GCM encryption across all code paths
+- **Pre-existing TypeScript error** in `app/api/admin/investors/bulk-import/route.ts` — removed invalid `investorCount` field from FundAggregate upsert (field doesn't exist on model)
+- **Outreach public routes misclassified** (P0 security fix) — `/api/outreach/unsubscribe` and `/api/outreach/track/` were classified as TEAM_SCOPED (inherited from `/api/outreach/` parent path) causing edge auth to block email tracking pixels and unsubscribe links with 401. Fixed by adding specific sub-paths to PUBLIC_PATHS which is evaluated first in `classifyRoute()`
+- **Job routes misclassified in CRON_PATHS** — `/api/jobs/` was in CRON_PATHS which requires `CRON_SECRET`, but job handlers use `INTERNAL_API_KEY` (a different secret). Edge middleware would reject legitimate job requests. Fixed by moving to PUBLIC_PATHS (handler-level INTERNAL_API_KEY auth provides security). `/api/internal/` similarly moved for consistency
+- **Comprehensive API route auth audit** — Audited all 205+ App Router routes and 293 Pages Router routes. Confirmed zero critical auth gaps — all "unprotected" routes are intentionally public (webhooks with signature verification, tracking pixels, health checks) or use handler-level auth (INTERNAL_API_KEY, validateApiToken, viewId-based)
+
+### Security
+- Edge auth expansion: ALL API routes now validated at edge level (was admin-only). Public routes explicitly allowlisted, cron routes verified via `CRON_SECRET`, authenticated routes require valid JWT
+- Wire instruction encryption: account numbers and routing numbers now encrypted at rest with AES-256-GCM via `encryptTaxId()`/`decryptTaxId()`
+- Demo credentials removed from all documentation — env var references only
+- Secrets audit confirms zero exposed secrets in source code
+- Admin auth edge middleware provides 4th defense-in-depth layer (edge JWT → app middleware → domain middleware → route handlers)
 
 ## [0.9.14] - 2026-02-20
 
@@ -417,7 +463,13 @@ All notable changes to FundRoom are documented here. Format follows [Keep a Chan
 
 | Version | Status | Date |
 |---------|--------|------|
-| 0.9.12 | Current | 2026-02-17 |
+| 0.9.14 | Current | 2026-02-20 |
+| 0.9.13 | Released | 2026-02-18 |
+| 0.9.12 | Released | 2026-02-17 |
+| 0.9.11 | Released | 2026-02-16 |
+| 0.9.10 | Released | 2026-02-15 |
+| 0.9.9 | Released | 2026-02-15 |
+| 0.9.8 | Released | 2026-02-15 |
 | 0.9.7 | Released | 2026-02-14 |
 | 0.9.6 | Released | 2026-02-13 |
 | 0.9.5 | Released | 2026-02-12 |

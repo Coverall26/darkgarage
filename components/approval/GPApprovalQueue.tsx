@@ -62,6 +62,8 @@ interface ApprovalItem {
   entityType?: string;
   commitmentAmount?: number;
   accreditationStatus?: string;
+  accreditationMethod?: string | null;
+  accreditationDocumentIds?: string[];
   documentType?: string;
   // For change requests
   changeRequest?: {
@@ -747,6 +749,12 @@ export default function GPApprovalQueue({
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm">{item.investorName}</span>
                         {getStatusBadge(item.status)}
+                        {item.accreditationMethod === "DOCUMENT_UPLOAD" && item.accreditationDocumentIds && item.accreditationDocumentIds.length > 0 && (
+                          <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/50">
+                            <FileTextIcon className="h-3 w-3 mr-1" aria-hidden="true" />
+                            {item.accreditationDocumentIds.length} Doc{item.accreditationDocumentIds.length > 1 ? "s" : ""} to Review
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500">
                         <span>{SUBMISSION_TYPE_LABELS[item.submissionType]}</span>
@@ -851,6 +859,15 @@ export default function GPApprovalQueue({
                           <div>
                             <p className="text-xs text-gray-500">Accreditation</p>
                             <p className="font-medium">{item.accreditationStatus}</p>
+                            {item.accreditationMethod && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Method: {item.accreditationMethod === "DOCUMENT_UPLOAD"
+                                  ? "Document Upload"
+                                  : item.accreditationMethod === "SELF_CERTIFICATION"
+                                    ? "Self-Certification"
+                                    : item.accreditationMethod}
+                              </p>
+                            )}
                           </div>
                         )}
                         {item.documentType && (
@@ -860,6 +877,36 @@ export default function GPApprovalQueue({
                           </div>
                         )}
                       </div>
+
+                      {/* 506(c) Accreditation documents */}
+                      {item.accreditationDocumentIds && item.accreditationDocumentIds.length > 0 && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30 p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileTextIcon className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                              506(c) Verification Documents ({item.accreditationDocumentIds.length})
+                            </p>
+                          </div>
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                            Investor uploaded accreditation verification documents. Review these before approving.
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {item.accreditationDocumentIds.map((docId: string, idx: number) => (
+                              <a
+                                key={docId}
+                                href={`/admin/documents?docId=${docId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-white dark:bg-gray-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors"
+                                aria-label={`Review document ${idx + 1} in new tab`}
+                              >
+                                <EyeIcon className="h-3 w-3" aria-hidden="true" />
+                                Document {idx + 1}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Change request comparison */}
                       {isChangeRequest && item.changeRequest && (

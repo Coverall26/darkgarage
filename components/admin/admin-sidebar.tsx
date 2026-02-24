@@ -85,9 +85,9 @@ const COMMON_TOP: NavItem[] = [
   },
   {
     label: "E-Signature",
-    href: "/sign",
+    href: "/admin/esign",
     icon: PenLine,
-    matchPaths: ["/sign"],
+    matchPaths: ["/admin/esign", "/sign"],
   },
   {
     label: "Visitors",

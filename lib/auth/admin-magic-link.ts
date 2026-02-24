@@ -1,8 +1,9 @@
 import { encode, decode } from "next-auth/jwt";
 
+import { isAuthDebugEnabled } from "@/lib/feature-flags";
 import { isUserAdminAsync } from "@/lib/constants/admins";
 
-const AUTH_DEBUG = process.env.AUTH_DEBUG === "true";
+const AUTH_DEBUG = isAuthDebugEnabled();
 const ADMIN_MAGIC_LINK_EXPIRY_SECONDS = 60 * 60; // 1 hour
 
 /**

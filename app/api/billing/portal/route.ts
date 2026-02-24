@@ -13,20 +13,23 @@ import { requireAuthAppRouter } from "@/lib/auth/rbac";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { stripeInstance } from "@/ee/stripe";
-import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { BillingPortalSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const blocked = await appRouterRateLimit(req);
+  const blocked = await appRouterStrictRateLimit(req);
   if (blocked) return blocked;
 
   try {
     const auth = await requireAuthAppRouter();
     if (auth instanceof NextResponse) return auth;
 
-    const body = await req.json().catch(() => ({}));
-    const { returnUrl } = body as { returnUrl?: string };
+    const parsed = await validateBody(req, BillingPortalSchema);
+    if (parsed.error) return parsed.error;
+    const { returnUrl } = parsed.data;
 
     // Resolve user's org
     const user = await prisma.user.findUnique({

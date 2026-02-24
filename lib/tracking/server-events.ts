@@ -1,10 +1,10 @@
 /**
  * Server-Side Event Publishing
  *
- * Sends tracking events to Tinybird from server-side code (API routes,
- * auth callbacks, etc.) using the project's standard @chronark/zod-bird SDK.
+ * Sends tracking events to PostHog from server-side code (API routes,
+ * auth callbacks, etc.) using the posthog-node SDK.
  *
- * Falls back to console.log when Tinybird is not configured.
+ * Falls back to console.log when PostHog is not configured.
  *
  * IMPORTANT: This file is server-only. Do NOT import from client components.
  * The barrel export (lib/tracking/index.ts) does NOT re-export this module.
@@ -21,60 +21,48 @@
 
 import "server-only";
 
-import { Tinybird } from "@chronark/zod-bird";
-import { z } from "zod";
+import { PostHog } from "posthog-node";
 
-/** Zod schema for server-side funnel/tracking events — no PII fields allowed. */
-const serverEventSchema = z.object({
-  event_name: z.string(),
-  timestamp: z.string(),
-  // User identification (ID only, never email/name)
-  userId: z.string().optional(),
-  // Context
-  teamId: z.string().optional(),
-  orgId: z.string().optional(),
-  portal: z.string().optional(),
-  method: z.string().optional(),
-  source: z.string().optional(),
-  // Deal/investor tracking
-  dealId: z.string().optional(),
-  investorId: z.string().optional(),
-  // Billing
-  plan: z.string().optional(),
-  priceId: z.string().optional(),
-  // Error context (no sensitive payment details)
-  errorType: z.string().optional(),
-  declineCode: z.string().optional(),
-});
-
-type ServerEvent = z.infer<typeof serverEventSchema>;
-
-/**
- * Lazily initialised Tinybird ingest endpoint.
- * Returns null when TINYBIRD_TOKEN is not set (dev/test environments).
- */
-function createIngestEndpoint() {
-  const token = process.env.TINYBIRD_TOKEN;
-  if (!token) return null;
-
-  const tb = new Tinybird({
-    token,
-    baseUrl:
-      process.env.TINYBIRD_HOST || "https://api.us-west-2.aws.tinybird.co",
-  });
-
-  return tb.buildIngestEndpoint({
-    datasource: "server_events__v1",
-    event: serverEventSchema,
-  });
+/** Properties allowed on server-side events — no PII fields. */
+interface ServerEventProperties {
+  userId?: string;
+  teamId?: string;
+  orgId?: string;
+  portal?: string;
+  method?: string;
+  source?: string;
+  dealId?: string;
+  investorId?: string;
+  plan?: string;
+  priceId?: string;
+  errorType?: string;
+  declineCode?: string;
+  [key: string]: string | number | boolean | undefined;
 }
 
-let _ingest: ReturnType<typeof createIngestEndpoint> | undefined;
-function getIngest() {
-  if (_ingest === undefined) {
-    _ingest = createIngestEndpoint();
+/**
+ * Lazily initialised PostHog client.
+ * Returns null when POSTHOG_SERVER_KEY (or NEXT_PUBLIC_POSTHOG_KEY) is not set.
+ */
+let _client: PostHog | null | undefined;
+
+function getPostHogClient(): PostHog | null {
+  if (_client !== undefined) return _client;
+
+  const apiKey =
+    process.env.POSTHOG_SERVER_KEY || process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!apiKey) {
+    _client = null;
+    return null;
   }
-  return _ingest;
+
+  _client = new PostHog(apiKey, {
+    host: process.env.POSTHOG_HOST || "https://us.i.posthog.com",
+    flushAt: 10,
+    flushInterval: 5000,
+  });
+
+  return _client;
 }
 
 /**
@@ -84,34 +72,44 @@ function getIngest() {
  * @param properties - Key/value properties (must NOT include PII like email/name)
  *
  * Behaviour:
- *  - If TINYBIRD_TOKEN is set, publishes via @chronark/zod-bird with schema validation.
+ *  - If PostHog key is set, publishes via posthog-node SDK.
  *  - Otherwise, logs to console so events are visible during development.
  *  - Errors are caught and logged — this function never throws.
  *  - Callers should NOT await this function (fire-and-forget).
  */
 export async function publishServerEvent(
   eventName: string,
-  properties: Omit<Partial<ServerEvent>, "event_name" | "timestamp"> = {},
+  properties: ServerEventProperties = {},
 ): Promise<void> {
-  const timestamp = new Date().toISOString();
+  const client = getPostHogClient();
 
-  const payload: ServerEvent = {
-    event_name: eventName,
-    timestamp,
-    ...properties,
-  };
-
-  const ingest = getIngest();
-
-  if (!ingest) {
+  if (!client) {
     // Dev/test fallback: log to console so events are visible
-    console.log(`[FUNNEL] ${eventName}`, payload);
+    console.log(`[FUNNEL] ${eventName}`, properties);
     return;
   }
 
   try {
-    await ingest(payload);
+    client.capture({
+      distinctId: properties.userId || "server",
+      event: eventName,
+      properties: {
+        ...properties,
+        $lib: "posthog-node",
+        source: properties.source || "server",
+      },
+    });
   } catch (error) {
-    console.warn("[SERVER_EVENTS] Tinybird publish error:", error);
+    console.warn("[SERVER_EVENTS] PostHog capture error:", error);
+  }
+}
+
+/**
+ * Flush pending PostHog events. Call during graceful shutdown.
+ */
+export async function flushServerEvents(): Promise<void> {
+  const client = getPostHogClient();
+  if (client) {
+    await client.shutdown();
   }
 }

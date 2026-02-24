@@ -5,6 +5,7 @@ import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { requireAdminAppRouter } from "@/lib/auth/rbac";
+import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import type { AccreditationStatus, InvestmentStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -21,10 +22,19 @@ const investorRowSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(),
   entityType: z
-    .enum(["INDIVIDUAL", "LLC", "TRUST", "RETIREMENT", "OTHER"])
+    .enum([
+      "INDIVIDUAL",
+      "LLC",
+      "TRUST",
+      "RETIREMENT",
+      "JOINT",
+      "PARTNERSHIP",
+      "CHARITY",
+      "OTHER",
+    ])
     .default("INDIVIDUAL"),
   entityName: z.string().optional(),
-  commitmentAmount: z.number().positive(),
+  commitmentAmount: z.number().positive().max(100_000_000_000),
   commitmentDate: z.string().optional(),
   fundingStatus: z.enum(["COMMITTED", "FUNDED"]).default("COMMITTED"),
   accreditationStatus: z.string().default("SELF_CERTIFIED"),
@@ -64,7 +74,7 @@ export async function GET() {
     "2026-01-15",
     "COMMITTED",
     "SELF_CERTIFIED",
-    "123 Main St, New York, NY 10001",
+    '"123 Main St, New York, NY 10001"',
     "Referred by Jane",
   ].join(",");
 
@@ -79,6 +89,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -162,6 +175,7 @@ export async function POST(req: NextRequest) {
           create: {
             userId: user.id,
             fundId,
+            teamId,
             entityType: row.entityType,
             entityName: row.entityName || null,
             address: row.address || null,
@@ -201,6 +215,7 @@ export async function POST(req: NextRequest) {
           create: {
             fundId,
             investorId: investor.id,
+            teamId,
             commitmentAmount: row.commitmentAmount,
             fundedAmount:
               row.fundingStatus === "FUNDED" ? row.commitmentAmount : 0,
@@ -219,7 +234,8 @@ export async function POST(req: NextRequest) {
           success: true,
           investorId: investor.id,
         });
-      } catch {
+      } catch (investorError) {
+        reportError(investorError as Error);
         results.push({
           email: row.email,
           name: row.name,
@@ -231,6 +247,32 @@ export async function POST(req: NextRequest) {
 
     const succeeded = results.filter((r) => r.success).length;
     const failed = results.filter((r) => !r.success).length;
+
+    // Sync FundAggregate with updated totals
+    if (succeeded > 0) {
+      try {
+        const aggregates = await prisma.investment.aggregate({
+          where: { fundId },
+          _sum: { commitmentAmount: true, fundedAmount: true },
+          _count: true,
+        });
+
+        await prisma.fundAggregate.upsert({
+          where: { fundId },
+          update: {
+            totalCommitted: aggregates._sum.commitmentAmount || 0,
+            totalInbound: aggregates._sum.fundedAmount || 0,
+          },
+          create: {
+            fundId,
+            totalCommitted: aggregates._sum.commitmentAmount || 0,
+            totalInbound: aggregates._sum.fundedAmount || 0,
+          },
+        });
+      } catch (aggError) {
+        reportError(aggError as Error);
+      }
+    }
 
     const ipAddress =
       req.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;

@@ -42,7 +42,7 @@ export async function advanceInvestorOnDocApproval({
 
     // 2. Check if any docs are still pending or need revision
     const hasPending = allDocs.some(
-      (doc: any) =>
+      (doc) =>
         doc.status === "UPLOADED_PENDING_REVIEW" ||
         doc.status === "REVISION_REQUESTED",
     );
@@ -52,7 +52,7 @@ export async function advanceInvestorOnDocApproval({
 
     // 3. Check if at least one doc is approved (not all rejected)
     const hasApproved = allDocs.some(
-      (doc: any) => doc.status === "APPROVED",
+      (doc) => doc.status === "APPROVED",
     );
 
     if (!hasApproved) return;
@@ -107,7 +107,7 @@ export async function advanceInvestorOnDocApproval({
 
       await prisma.investor.update({
         where: { id: investorId },
-        data: updateData as any,
+        data: updateData,
       });
     }
 
@@ -124,7 +124,7 @@ export async function advanceInvestorOnDocApproval({
         investorId,
         fundId,
         approvedDocCount: allDocs.filter(
-          (d: any) => d.status === "APPROVED",
+          (d) => d.status === "APPROVED",
         ).length,
         totalDocCount: allDocs.length,
       },

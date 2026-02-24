@@ -8,6 +8,7 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { declineEnvelope } from "@/lib/esign/envelope-service";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { sendEnvelopeDeclinedEmails } from "@/lib/emails/send-esign-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +65,13 @@ export async function POST(
       userAgent
     );
 
-    // TODO: Send notification to envelope creator that signer declined
-    // TODO: Send notification to other recipients that signing was declined
+    // Fire-and-forget: Notify creator and other recipients of decline
+    sendEnvelopeDeclinedEmails(
+      id,
+      recipient.name || recipient.email,
+      recipient.email,
+      reason,
+    ).catch((e) => reportError(e as Error));
 
     return NextResponse.json({
       status: declined.status,

@@ -7,6 +7,8 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { SetupAdminSchema } from "@/lib/validations/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -27,12 +29,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { password, currentPassword } = body;
-
-  if (!password || typeof password !== "string" || password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
-  }
+  const parsed = await validateBody(req, SetupAdminSchema);
+  if (parsed.error) return parsed.error;
+  const { password, currentPassword } = parsed.data;
 
   const sessionEmail = (session.user.email as string).toLowerCase().trim();
 

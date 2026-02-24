@@ -238,12 +238,13 @@ export async function getAumHistory(
 ) {
   const { period, from, to, limit = 365 } = options;
 
-  const where: any = { fundId };
+  const where: Record<string, unknown> = { fundId };
   if (period) where.period = period;
   if (from || to) {
-    where.date = {};
-    if (from) where.date.gte = from;
-    if (to) where.date.lte = to;
+    const dateFilter: Record<string, Date> = {};
+    if (from) dateFilter.gte = from;
+    if (to) dateFilter.lte = to;
+    where.date = dateFilter;
   }
 
   return prisma.aumSnapshot.findMany({

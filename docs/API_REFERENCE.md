@@ -380,9 +380,9 @@ All API routes require authentication via `getServerSession()` unless noted othe
 | Method | Route | Purpose |
 |--------|-------|---------|
 | GET, POST | `/api/analytics` | Get/record analytics events |
-| POST | `/api/record_view` | Record document view (Tinybird) |
-| POST | `/api/record_click` | Record click event (Tinybird) |
-| POST | `/api/record_video_view` | Record video view (Tinybird) |
+| POST | `/api/record_view` | Record document view (PostHog) |
+| POST | `/api/record_click` | Record click event (PostHog) |
+| POST | `/api/record_video_view` | Record video view (PostHog) |
 | GET, POST | `/api/views` | View tracking with `?ref=` referral |
 | GET, POST | `/api/views-dataroom` | Dataroom-specific view tracking |
 

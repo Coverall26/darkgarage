@@ -9,6 +9,7 @@ import { sendInvestorApprovedEmail } from "@/lib/emails/send-investor-approved";
 import { sendInvestorChangesRequestedEmail } from "@/lib/emails/send-investor-changes-requested";
 import { sendInvestorRejectedEmail } from "@/lib/emails/send-investor-rejected";
 import { publishServerEvent } from "@/lib/tracking/server-events";
+import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { ChangeRequestType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ investorId: string }> },
 ) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   const { investorId } = await params;
 
   const session = await getServerSession(authOptions);

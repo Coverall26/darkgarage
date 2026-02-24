@@ -6,7 +6,7 @@ import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
 import { getDocumentWithTeamAndUser } from "@/lib/team/helper";
-import { getViewPageDuration } from "@/lib/tinybird";
+import { getViewDurationStatsPg } from "@/lib/tracking/postgres-stats";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
 
@@ -102,10 +102,9 @@ export default async function handle(
           : views;
 
       const durationsPromises = limitedViews.map((view) => {
-        return getViewPageDuration({
+        return getViewDurationStatsPg({
           documentId: view.documentId!,
           viewId: view.id,
-          since: 0,
         });
       });
 

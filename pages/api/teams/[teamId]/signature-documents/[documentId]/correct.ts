@@ -20,7 +20,7 @@ export default async function handler(
   const userTeam = await prisma.userTeam.findFirst({
     where: {
       teamId,
-      userId: (session.user as any).id,
+      userId: session.user.id,
     },
   });
 
@@ -85,7 +85,7 @@ export default async function handler(
           emailMessage: existingDoc.emailMessage,
           expirationDate: existingDoc.expirationDate,
           teamId: existingDoc.teamId,
-          createdById: (session.user as any).id,
+          createdById: session.user.id,
         },
       });
 

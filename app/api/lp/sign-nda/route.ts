@@ -6,6 +6,8 @@ import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
 import { publishServerEvent } from "@/lib/tracking/server-events";
 import { sendNdaSignedConfirmation } from "@/lib/emails/send-nda-signed-confirmation";
+import { validateBody } from "@/lib/middleware/validate";
+import { SignNdaSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +25,9 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const body = await req.json();
-    const { fundId, ndaAccepted, signatureMethod, signatureData } = body;
-
-    if (!ndaAccepted) {
-      return NextResponse.json(
-        { error: "NDA must be accepted to proceed" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, SignNdaSchema);
+    if (parsed.error) return parsed.error;
+    const { fundId, ndaAccepted, signatureMethod, signatureData } = parsed.data;
 
     // Find the investor profile
     const user = await prisma.user.findUnique({
@@ -83,8 +79,8 @@ export async function POST(req: NextRequest) {
         fundId: fundId || null,
         signedAt: now.toISOString(),
         signatureMethod: signatureMethod || "CHECKBOX", // TYPED, DRAWN, or CHECKBOX
-        ...(signatureMethod === "TYPED" && signatureData?.typedName
-          ? { typedName: String(signatureData.typedName).slice(0, 255) }
+        ...(signatureMethod === "TYPED" && signatureData
+          ? { typedName: String(signatureData).slice(0, 255) }
           : {}),
         ...(signatureMethod === "DRAWN" ? { hasDrawnSignature: true } : {}),
         ipAddress:

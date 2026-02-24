@@ -88,10 +88,10 @@ const routeHandlers = {
         },
       });
 
-      const viewerIds = conversations.flatMap((conv: any) =>
+      const viewerIds = conversations.flatMap((conv: { participants: Array<{ viewerId: string | null }> }) =>
         conv.participants
-          .map((p: any) => p.viewerId)
-          .filter((id: any): id is string => id !== null),
+          .map((p: { viewerId: string | null }) => p.viewerId)
+          .filter((id): id is string => id !== null),
       );
 
       const viewers = await prisma.viewer.findMany({
@@ -106,12 +106,12 @@ const routeHandlers = {
         },
       });
 
-      const formattedConversations = conversations.map((conversation: any) => {
+      const formattedConversations = conversations.map((conversation: typeof conversations[number]) => {
         const participants = conversation.participants.map(
-          (p: any) => p.viewerId,
+          (p: { viewerId: string | null }) => p.viewerId,
         );
 
-        const viewer = viewers.find((v: any) => participants.includes(v.id));
+        const viewer = viewers.find((v: { id: string }) => participants.includes(v.id));
 
         return {
           id: conversation.id,
@@ -123,7 +123,7 @@ const routeHandlers = {
           unreadCount: conversation._count.messages,
           lastMessage: conversation.messages[0] || null,
           dataroomDocumentName: conversation.dataroomDocumentId
-            ? conversation.dataroomDocument.document.name
+            ? conversation.dataroomDocument?.document.name
             : undefined,
           documentPageNumber: conversation.dataroomDocumentId
             ? conversation.documentPageNumber
@@ -295,14 +295,14 @@ const routeHandlers = {
       });
 
       // Get viewer emails
-      const viewerIds = conversations.flatMap((conv: any) =>
-        conv.participants.map((p: any) => p.viewerId),
+      const viewerIds = conversations.flatMap((conv: { participants: Array<{ viewerId: string | null }> }) =>
+        conv.participants.map((p: { viewerId: string | null }) => p.viewerId),
       );
 
       const viewers = await prisma.viewer.findMany({
         where: {
           id: {
-            in: viewerIds,
+            in: viewerIds.filter((id): id is string => id !== null),
           },
         },
         select: {
@@ -312,8 +312,8 @@ const routeHandlers = {
       });
 
       // Format the response
-      const formattedConversations = conversations.map((conversation: any) => {
-        const viewer = viewers.find((v: any) => v.id === conversation.viewerId);
+      const formattedConversations = conversations.map((conversation: typeof conversations[number] & { viewerId?: string }) => {
+        const viewer = viewers.find((v: { id: string }) => v.id === conversation.viewerId);
 
         return {
           id: conversation.id,

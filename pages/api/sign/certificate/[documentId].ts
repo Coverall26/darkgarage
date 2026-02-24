@@ -12,7 +12,7 @@ import {
   CertificateAuditEvent,
   generateCertificateId,
 } from "@/lib/signature/completion-certificate";
-import { generateDocumentHash } from "@/lib/signature/checksum";
+import { generateDocumentHash, SignatureChecksum } from "@/lib/signature/checksum";
 import { reportError } from "@/lib/error";
 
 export default async function handler(
@@ -149,7 +149,7 @@ export default async function handler(
         status: r.status,
         signedAt: r.signedAt,
         ipAddress: r.ipAddress,
-        signatureChecksum: r.signatureChecksum as any,
+        signatureChecksum: r.signatureChecksum as SignatureChecksum | null,
       })
     );
 
@@ -158,7 +158,7 @@ export default async function handler(
       timestamp: log.createdAt,
       recipientEmail: log.recipientEmail,
       ipAddress: log.ipAddress,
-      metadata: log.metadata as Record<string, any> | undefined,
+      metadata: log.metadata as Record<string, unknown> | undefined,
     }));
 
     const certificateData: CertificateData = {

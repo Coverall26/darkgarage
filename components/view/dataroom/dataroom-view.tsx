@@ -394,7 +394,6 @@ export default function DataroomView({
     if (!isMounted) return; // Wait for component to be mounted
 
     if (magicLinkToken && verifiedEmail && !magicLinkProcessed && !submitted) {
-      console.log("[MAGIC_LINK] Processing token with email:", verifiedEmail);
       setCode(magicLinkToken);
       setMagicLinkProcessed(true);
       handleSubmission(magicLinkToken);

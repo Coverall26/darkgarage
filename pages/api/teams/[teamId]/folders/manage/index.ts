@@ -5,8 +5,10 @@ import slugify from "@sindresorhus/slugify";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
+import { FolderRenameSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -21,7 +23,13 @@ export default async function handle(
     }
     const userId = (session.user as CustomUser).id;
     const { teamId } = req.query as { teamId: string };
-    const { folderId, name } = req.body as { folderId: string; name: string };
+    const parsed = validateBodyPagesRouter(req.body, FolderRenameSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { folderId, name } = parsed.data;
 
     try {
       const team = await prisma.team.findUnique({

@@ -6,8 +6,10 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import { getFeatureFlags } from "@/lib/featureFlags";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
+import { DataroomUpdateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -107,6 +109,12 @@ export default async function handle(
         return res.status(401).end("Unauthorized");
       }
 
+      const parsed = validateBodyPagesRouter(req.body, DataroomUpdateSchema);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: "Validation failed", issues: parsed.issues });
+      }
       const {
         name,
         enableChangeNotifications,
@@ -115,15 +123,7 @@ export default async function handle(
         showLastUpdated,
         tags,
         agentsEnabled,
-      } = req.body as {
-        name?: string;
-        enableChangeNotifications?: boolean;
-        defaultPermissionStrategy?: DefaultPermissionStrategy;
-        allowBulkDownload?: boolean;
-        showLastUpdated?: boolean;
-        tags?: string[];
-        agentsEnabled?: boolean;
-      };
+      } = parsed.data;
 
       const featureFlags = await getFeatureFlags({ teamId: team.id });
 
@@ -139,7 +139,7 @@ export default async function handle(
             ...(typeof enableChangeNotifications === "boolean" && {
               enableChangeNotifications,
             }),
-            ...(defaultPermissionStrategy && { defaultPermissionStrategy }),
+            ...(defaultPermissionStrategy && { defaultPermissionStrategy: defaultPermissionStrategy as DefaultPermissionStrategy }),
             ...(typeof allowBulkDownload === "boolean" && {
               allowBulkDownload,
             }),

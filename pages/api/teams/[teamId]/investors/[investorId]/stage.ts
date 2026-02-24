@@ -6,6 +6,7 @@ import {
   getStageInfo,
   isValidTransition,
   confirmWireReceived,
+  INVESTOR_STAGES,
 } from "@/lib/investor";
 import type { InvestorStage } from "@/lib/investor";
 import prisma from "@/lib/prisma";
@@ -80,16 +81,8 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: "stage and fundId are required" });
   }
 
-  // Validate that the stage is a known value
-  const validStages: InvestorStage[] = [
-    "APPLIED",
-    "UNDER_REVIEW",
-    "APPROVED",
-    "REJECTED",
-    "COMMITTED",
-    "FUNDED",
-  ];
-  if (!validStages.includes(stage)) {
+  // Validate that the stage is a known value (use canonical INVESTOR_STAGES to stay in sync)
+  if (!(INVESTOR_STAGES as readonly string[]).includes(stage)) {
     return res.status(400).json({ error: `Invalid stage: ${stage}` });
   }
 

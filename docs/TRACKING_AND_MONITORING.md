@@ -109,7 +109,7 @@ Integrated via `@vercel/analytics` and `@vercel/speed-insights` packages:
 These rules MUST be followed when adding or modifying tracking code:
 
 ### Server-Side Events (`publishServerEvent`)
-1. **Use `@chronark/zod-bird` SDK** — Never use raw `fetch()` to Tinybird. Always use the typed `publishServerEvent()` from `lib/tracking/server-events.ts`.
+1. **Use `publishServerEvent()`** — Always use the typed `publishServerEvent()` from `lib/tracking/server-events.ts` for server-side event publishing to PostHog.
 2. **Server-only** — `server-events.ts` has `import "server-only"`. It MUST NOT be imported from client components or barrel exports.
 3. **No PII** — NEVER pass email addresses, names, IP addresses, or any personally identifiable information to `publishServerEvent`. Use `userId`, `teamId`, `orgId` only.
 4. **Fire-and-forget** — NEVER `await` publishServerEvent on the critical path. Call it without `await` so it doesn't block the response.
@@ -122,7 +122,7 @@ These rules MUST be followed when adding or modifying tracking code:
 
 ### Event Naming Conventions
 - Funnel events: `funnel_<action>` (e.g., `funnel_signup_started`, `funnel_first_document_uploaded`)
-- `first_*` events fire on every occurrence — deduplication happens at the Tinybird query layer using `min(timestamp)` per teamId.
+- `first_*` events fire on every occurrence — deduplication happens at the PostHog query layer using `min(timestamp)` per teamId.
 - Server events use the same naming scheme as client events.
 
 ---
@@ -463,11 +463,11 @@ Admin-only endpoint (`GET /api/admin/launch-health`) that returns:
 
 ---
 
-## 6. Server-Side Event Tracking (Tinybird)
+## 6. Server-Side Event Tracking (PostHog)
 
 **File:** `lib/tracking/server-events.ts`
 
-Server-side events are sent to Tinybird using the `@chronark/zod-bird` SDK. Events are typed with a Zod schema and published via a datasource endpoint.
+Server-side events are sent to PostHog using the PostHog Node SDK. Events are typed with a Zod schema and published via the server-side API.
 
 ```typescript
 import { publishServerEvent } from "@/lib/tracking/server-events";
@@ -515,7 +515,7 @@ publishServerEvent("funnel_invitation_accepted", {
 | `lib/rollbar.ts` | Rollbar SDK initialization (client + server configs) |
 | `lib/error.ts` | Error reporting utilities (`reportError`, `handleApiError`, etc.) |
 | `lib/tracking/analytics-events.ts` | Typed event definitions and tracking functions |
-| `lib/tracking/server-events.ts` | Server-side Tinybird event publishing (zod-bird SDK) |
+| `lib/tracking/server-events.ts` | Server-side PostHog event publishing |
 | `lib/tracking/use-tracking.ts` | React hook for consent-aware client-side tracking |
 | `lib/tracking/failure-tracker.ts` | Automatic client-side error/failure capture |
 | `lib/tracking/cookie-consent.ts` | Consent preferences parsing/serialization |
@@ -553,7 +553,7 @@ The CSP explicitly allows Rollbar and PostHog domains:
 
 **script-src:** `'self' 'unsafe-inline' 'unsafe-eval' fundroom.ai *.fundroom.ai *.bermudafranchisegroup.com *.posthog.com eu.posthog.com api.rollbar.com *.rollbar.com js.stripe.com *.plaid.com *.persona.com`
 
-**connect-src:** `'self' *.posthog.com eu.posthog.com api.rollbar.com *.rollbar.com *.fundroom.ai *.bermudafranchisegroup.com api.stripe.com *.plaid.com api.tinybird.co ...`
+**connect-src:** `'self' *.posthog.com eu.posthog.com api.rollbar.com *.rollbar.com *.fundroom.ai *.bermudafranchisegroup.com api.stripe.com *.plaid.com ...`
 
 Custom domains (e.g., `fundroom.bermudafranchisegroup.com`) require explicit CSP allowlisting because `'self'` only covers the requesting domain, not the asset-serving domain (`fundroom.ai`).
 

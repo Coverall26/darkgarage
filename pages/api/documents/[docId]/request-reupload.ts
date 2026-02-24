@@ -1,9 +1,14 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
+import { z } from "zod";
 import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { reportError } from "@/lib/error";
+
+const DocumentReviewSchema = z.object({
+  reviewNotes: z.string().max(2000, "reviewNotes exceeds 2000 characters").optional(),
+});
 
 /**
  * PATCH /api/documents/[docId]/request-reupload
@@ -31,7 +36,13 @@ export default async function handler(
       return res.status(400).json({ error: "Document ID is required" });
     }
 
-    const { reviewNotes } = req.body || {};
+    const parsed = DocumentReviewSchema.safeParse(req.body || {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: parsed.error.issues[0]?.message || "Invalid request body",
+      });
+    }
+    const { reviewNotes } = parsed.data;
 
     const lpDocument = await prisma.lPDocument.findUnique({
       where: { id: docId, deletedAt: null },

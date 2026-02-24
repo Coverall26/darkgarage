@@ -7,6 +7,8 @@ import {
 } from "@/lib/marketplace";
 import { verifyNotBot } from "@/lib/security/bot-protection";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { DealInterestSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -51,14 +53,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, DealInterestSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     const interest = await expressInterest(
       {
         dealId,
-        indicativeAmount: body.indicativeAmount,
-        notes: body.notes,
-        conditionsOrTerms: body.conditionsOrTerms,
+        indicativeAmount: body.amount,
+        notes: body.notes ?? undefined,
+        conditionsOrTerms: undefined,
       },
       auth.userId,
       body.investorId,

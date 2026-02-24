@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { requireAdminAppRouter } from "@/lib/auth/rbac";
+import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { ActivateFundroomSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,15 +20,13 @@ export const dynamic = "force-dynamic";
  * Body: { teamId, fundId?, mode? }
  */
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { teamId, fundId, mode } = body;
+  const blocked = await appRouterStrictRateLimit(req);
+  if (blocked) return blocked;
 
-  if (!teamId) {
-    return NextResponse.json(
-      { error: "teamId is required" },
-      { status: 400 },
-    );
-  }
+  // Validate body first — teamId needed for auth check
+  const parsed = await validateBody(req, ActivateFundroomSchema);
+  if (parsed.error) return parsed.error;
+  const { teamId, fundId, mode } = parsed.data;
 
   const auth = await requireAdminAppRouter(teamId);
   if (auth instanceof NextResponse) return auth;

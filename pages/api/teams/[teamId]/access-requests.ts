@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { isAdminEmail } from "@/lib/constants/admins";
 import { reportError } from "@/lib/error";
+import { AccessRequestStatus } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
@@ -31,11 +32,13 @@ export default async function handler(
   if (req.method === "GET") {
     try {
       const { status = "PENDING" } = req.query as { status?: string };
+      const validStatuses: string[] = Object.values(AccessRequestStatus);
+      const statusValue = validStatuses.includes(status) ? (status as AccessRequestStatus) : AccessRequestStatus.PENDING;
 
       const accessRequests = await prisma.accessRequest.findMany({
         where: {
           teamId,
-          status: status as any,
+          status: statusValue,
         },
         include: {
           link: {

@@ -6,11 +6,13 @@ import { waitUntil } from "@vercel/functions";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { sendDataroomChangeNotificationTask } from "@/lib/trigger/dataroom-change-notification";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
 import { sortItemsByIndexAndName } from "@/lib/utils/sort-items-by-index-name";
+import { DataroomDocumentAddSchema } from "@/lib/validations/teams";
 
 
 export default async function handle(
@@ -112,11 +114,13 @@ export default async function handle(
 
     const userId = (session.user as CustomUser).id;
 
-    // Assuming data is an object with `name` and `description` properties
-    const { documentId, folderPathName } = req.body as {
-      documentId: string;
-      folderPathName?: string;
-    };
+    const parsed = validateBodyPagesRouter(req.body, DataroomDocumentAddSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { documentId, folderPathName } = parsed.data;
 
     try {
       // Check if the user is part of the team

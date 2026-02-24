@@ -3,6 +3,8 @@ import { requireAuthAppRouter } from "@/lib/auth/rbac";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { NotificationPreferencesSchema } from "@/lib/validations/teams";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +70,11 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const userId = auth.userId;
-    const body = await req.json();
+
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, NotificationPreferencesSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     // Build update data from whitelisted boolean fields
     const updateData: Record<string, boolean | string> = {};

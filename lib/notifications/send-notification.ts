@@ -19,7 +19,7 @@ interface SendNotificationOptions {
   type: NotificationType;
   title: string;
   body: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
   url?: string;
 }
 
@@ -81,8 +81,9 @@ export async function sendNotification({
         },
         payload
       );
-    } catch (error: any) {
-      if (error.statusCode === 410 || error.statusCode === 404) {
+    } catch (error: unknown) {
+      const statusCode = (error as { statusCode?: number }).statusCode;
+      if (statusCode === 410 || statusCode === 404) {
         await prisma.pushSubscription.delete({ where: { id: sub.id } });
       }
       console.error("Push notification failed:", error);
@@ -100,7 +101,13 @@ export async function sendNotification({
 }
 
 function checkPushPreference(
-  preferences: any,
+  preferences: {
+    pushDocumentViewed: boolean;
+    pushSignatureComplete: boolean;
+    pushCapitalCall: boolean;
+    pushDistribution: boolean;
+    pushNewDocument: boolean;
+  },
   type: NotificationType
 ): boolean {
   switch (type) {

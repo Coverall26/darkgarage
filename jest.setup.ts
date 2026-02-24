@@ -389,11 +389,6 @@ jest.mock('@/pages/api/teams/[teamId]/signature-documents/[documentId]/send', ()
   sendToNextSigners: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/tinybird', () => ({
-  recordAnalytics: jest.fn().mockResolvedValue(undefined),
-  recordSignatureEvent: jest.fn().mockResolvedValue(undefined),
-}));
-
 jest.mock('resend', () => ({
   Resend: jest.fn().mockImplementation(() => ({
     emails: {

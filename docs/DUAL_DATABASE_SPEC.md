@@ -1,9 +1,9 @@
-# Dual-Database Architecture: Supabase (Primary) + Replit Postgres (Backup)
+# Dual-Database Architecture: Supabase (Primary) + Backup PostgreSQL
 
-> **See also:** [`docs/BUG_MONITORING_TOOLS_REPORT.md`](./BUG_MONITORING_TOOLS_REPORT.md) — Section 15 covers dual-database health monitoring and debugging workflows.
+> **See also:** [`DEPLOYMENT.md`](./DEPLOYMENT.md) for production database configuration.
 
 ## Overview
-Every database write (create, update, upsert, delete) hits Supabase first, then is replicated asynchronously to Replit Postgres as a hot backup. Backup failures must never break the primary.
+Every database write (create, update, upsert, delete) hits Supabase first, then is replicated asynchronously to a backup PostgreSQL instance as a hot backup. Backup failures must never break the primary.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ App → Prisma Client (SUPABASE_DATABASE_URL || DATABASE_URL → Supabase)
          ↓ Queues backup operation with result data
       Ordered per-model backup queue
          ↓ Sequential processing per entity
-      Backup Prisma Client (REPLIT_DATABASE_URL → Replit Postgres)
+      Backup Prisma Client (REPLIT_DATABASE_URL → Backup PostgreSQL)
          ↓ Uses upsert (idempotent, retry-safe)
 ```
 
@@ -50,9 +50,9 @@ The backup-write extension must be LAST because in Prisma, the last `$extends()`
 | Variable | Source | Purpose |
 |----------|--------|---------|
 | `SUPABASE_DATABASE_URL` | Supabase (secret) | **Primary** database — preferred by `lib/prisma.ts` |
-| `DATABASE_URL` | Supabase or Replit (secret/env) | Fallback primary database (used if `SUPABASE_DATABASE_URL` not set) |
+| `DATABASE_URL` | Supabase (secret/env) | Fallback primary database (used if `SUPABASE_DATABASE_URL` not set) |
 | `POSTGRES_PRISMA_URL` | Supabase (existing secret) | Pooled Supabase connection (same as DATABASE_URL) |
-| `REPLIT_DATABASE_URL` | Replit Postgres (env var) | Backup database |
+| `REPLIT_DATABASE_URL` | Backup PostgreSQL (env var) | Backup database connection string |
 | `BACKUP_DB_ENABLED` | Env var, `"true"/"false"` | Kill switch to disable backup writes (currently `"false"`) |
 
 ### Connection Priority (lib/prisma.ts)
@@ -60,10 +60,10 @@ The backup-write extension must be LAST because in Prisma, the last `$extends()`
 1. **`SUPABASE_DATABASE_URL`** — checked first, always points to Supabase session pooler (port 5432)
 2. **`DATABASE_URL`** — fallback if `SUPABASE_DATABASE_URL` is not set
 
-This eliminates the previous DATABASE_URL conflict in Replit where Replit's runtime could override the Supabase connection string.
+This eliminates potential `DATABASE_URL` conflicts in development environments.
 
 ### Port Selection
-- **Port 5432** (session pooler) — used from Replit/Claude because the transaction pooler times out from Replit's network
+- **Port 5432** (session pooler) — used for interactive development sessions (lower timeout risk)
 - **Port 6543** (transaction pooler) — used from Vercel serverless functions for connection pooling
 
 ## Implementation Files
@@ -116,7 +116,7 @@ async create({ model, args, query }) {
 ```
 
 ### sync-backup-db.ts
-- One-time script to copy all data from Supabase to Replit DB
+- One-time script to copy all data from Supabase to backup DB
 - Reads tables in dependency order (Users first, then related tables)
 - Batch inserts (500 rows per batch)
 - Uses upsert to be idempotent (safe to re-run)
@@ -136,7 +136,7 @@ After any Prisma migration on Supabase:
 ### Schema Sync Status (Feb 15, 2026)
 Both databases are fully synced with the Prisma schema:
 
-| Metric | Supabase (Production) | Replit (Development) |
+| Metric | Supabase (Production) | Backup (Development) |
 |--------|----------------------|---------------------|
 | Tables | 117 | 117 |
 | Columns | 1,694 | 1,694 |
@@ -147,7 +147,7 @@ Both databases are fully synced with the Prisma schema:
 **Last sync date**: Feb 15, 2026.
 **Items added since Feb 13**: 11 columns on OrganizationDefaults (LP onboarding settings), 3 columns on SignatureDocument (signedFileUrl, signedFileType, signedAt), 7 columns on Investor (entityType, entityDetails, taxIdType, taxIdEncrypted, authorizedSigner fields, sourceOfFunds, occupation), 6 composite indexes (Investor, Investment, LPDocument).
 **Items added to Supabase (Feb 13)**: 8 tables, 36+ columns, 1 enum.
-**Items added to Replit (Feb 13)**: 3 tables.
+**Items added to backup (Feb 13)**: 3 tables.
 
 ## Encrypted Data Replication
 
@@ -173,6 +173,6 @@ The `stripRelations()` helper in `backup-write.ts` only strips Prisma relation o
 
 | Document | Coverage |
 |----------|----------|
-| [`docs/BUG_MONITORING_TOOLS_REPORT.md`](./BUG_MONITORING_TOOLS_REPORT.md) | DB health monitoring, debugging backup sync issues |
+| [`docs/DEPLOYMENT.md`](./DEPLOYMENT.md) | Production database configuration, health checks |
 | [`docs/TRACKING_AND_MONITORING.md`](./TRACKING_AND_MONITORING.md) | Error reporting, Rollbar integration |
 | `CLAUDE.md` | Project overview with bug monitoring quick reference |

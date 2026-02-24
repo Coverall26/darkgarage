@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { getViewUserAgent, getViewUserAgent_v2 } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 
 export default async function handle(
@@ -55,30 +54,25 @@ export default async function handle(
         return res.status(403).end("Forbidden");
       }
 
-      let userAgent: {
-        rows?: number | undefined;
-        data: {
-          country: string;
-          city: string;
-          browser: string;
-          os: string;
-          device: string;
-        }[];
-      };
-
-      userAgent = await getViewUserAgent({
-        viewId: viewId,
+      // Query PageView for user agent data
+      const pageView = await prisma.pageView.findFirst({
+        where: { viewId: viewId },
+        select: {
+          country: true,
+          city: true,
+          browser: true,
+          os: true,
+          device: true,
+        },
       });
 
-      if (!userAgent || userAgent.rows === 0) {
-        userAgent = await getViewUserAgent_v2({
-          documentId: docId,
-          viewId: viewId,
-          since: 0,
-        });
-      }
-
-      const userAgentData = userAgent.data[0];
+      const userAgentData = pageView || {
+        country: "",
+        city: "",
+        browser: "",
+        os: "",
+        device: "",
+      };
       // Include country and city for business and datarooms plans
       if (team.plan.includes("business") || team.plan.includes("datarooms")) {
         return res.status(200).json(userAgentData);

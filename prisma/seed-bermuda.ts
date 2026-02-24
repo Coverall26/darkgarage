@@ -156,7 +156,7 @@ async function main() {
 
   // 1b. Create or find GP demo user (joe@bermudafranchisegroup.com)
   const gpDemoEmail = "joe@bermudafranchisegroup.com";
-  const gpDemoPassword = await bcrypt.hash("FundRoom2026!", 12);
+  const gpDemoPassword = await bcrypt.hash(process.env.GP_SEED_PASSWORD || "FundRoom2026!", 12);
   let gpDemoUser = await prisma.user.findUnique({
     where: { email: gpDemoEmail },
   });
@@ -787,7 +787,7 @@ async function main() {
 
   // 11. Create Demo LP Investors at various pipeline stages
   if (fund && !dryRun) {
-    const lpPassword = await bcrypt.hash("Investor2026!", 12);
+    const lpPassword = await bcrypt.hash(process.env.LP_SEED_PASSWORD || "Investor2026!", 12);
     const now = new Date();
     const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000);
 
@@ -1730,11 +1730,11 @@ async function main() {
   console.log("    LP 4: ira-investor@example.com   — DOCS_APPROVED (IRA, $90K)");
   console.log("    LP 5: partnership-investor@...    — UNDER_REVIEW (Partnership, $270K)");
   console.log("    LP 6: wire-pending@example.com   — COMMITTED + wire proof ($90K)");
-  console.log("    All LP passwords: Investor2026!");
+  console.log("    All LP passwords: (see LP_SEED_PASSWORD env var)");
   console.log("");
   console.log("  Demo Credentials:");
-  console.log("    GP:  joe@bermudafranchisegroup.com / FundRoom2026!");
-  console.log("    LP:  demo-investor@example.com / Investor2026!");
+  console.log("    GP:  joe@bermudafranchisegroup.com / (see GP_SEED_PASSWORD env var)");
+  console.log("    LP:  demo-investor@example.com / (see LP_SEED_PASSWORD env var)");
 
   if (team) {
     console.log(`\n    Team ID:  ${team.id}`);
@@ -1810,8 +1810,8 @@ async function cleanBFGData() {
     await prisma.userTeam.deleteMany({ where: { teamId } });
   }
 
-  // Clean platform settings
-  await prisma.platformSettings.deleteMany({ where: { key: "global" } });
+  // NOTE: Do NOT delete platformSettings — it's a global singleton affecting all tenants.
+  // The seed creates it with key "global" but other tenants may depend on it.
 
   await prisma.team.deleteMany({ where: { organizationId: org.id } });
   await prisma.organizationSecurityPolicy.deleteMany({

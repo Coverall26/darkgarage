@@ -4,7 +4,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
-import { CustomUser } from "@/lib/types";
+import { validateBody } from "@/lib/middleware/validate";
+import { ToggleFundroomAccessSchema } from "@/lib/validations/teams";
 
 export const dynamic = "force-dynamic";
 
@@ -26,17 +27,15 @@ export async function PUT(
   }
 
   try {
-    const body = await req.json();
-    const { userId, hasFundroomAccess } = body;
-
-    if (!userId || typeof hasFundroomAccess !== "boolean") {
-      return NextResponse.json({ error: "Missing userId or hasFundroomAccess" }, { status: 400 });
-    }
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, ToggleFundroomAccessSchema);
+    if (parsed.error) return parsed.error;
+    const { userId, hasFundroomAccess } = parsed.data;
 
     const currentUser = await prisma.userTeam.findUnique({
       where: {
         userId_teamId: {
-          userId: (session.user as CustomUser).id,
+          userId: session.user.id,
           teamId,
         },
       },

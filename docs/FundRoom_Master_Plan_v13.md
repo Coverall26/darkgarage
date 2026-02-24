@@ -68,12 +68,12 @@ Mode determines document templates, dashboards, workflows/wizards, and provider 
 
 - Frontend: Next.js 16 App Router + shadcn/ui + Tailwind CSS
 - Backend: Next.js API routes + NextAuth (email/password, Google OAuth)
-- Database: Prisma ORM + PostgreSQL (Supabase primary + Replit Postgres backup)
-- Storage: S3 + CloudFront (KMS-encrypted, per-org prefixes) + Replit Object Storage
+- Database: Prisma ORM + PostgreSQL (Supabase primary + optional backup PostgreSQL)
+- Storage: S3 + CloudFront (KMS-encrypted, per-org prefixes) + Vercel Blob
 - Email: Resend (transactional + notifications, org-branded)
 - E-Signature: FundRoom Sign (native, self-hosted, zero external API cost)
 - SaaS Billing: Stripe Billing
-- Monitoring: Rollbar (server+client) + Vercel Web Analytics (`@vercel/analytics`) + Vercel Speed Insights (`@vercel/speed-insights`) + Tinybird (server events) + PostHog (client)
+- Monitoring: Rollbar (server+client) + Vercel Web Analytics (`@vercel/analytics`) + Vercel Speed Insights (`@vercel/speed-insights`) + PostHog (server events + client analytics)
 - Testing: Jest 30 + React Testing Library (103 test files, 555 tests passing)
 - CI/CD: GitHub Actions (test, production, preview, integration workflows)
 - Deployment MVP: Vercel. Production: AWS ECS Fargate + ALB + Route 53
@@ -569,9 +569,9 @@ All Phase 1 features implemented and functional:
 | Manual Investor Entry | **DONE** | Investor create API + pipeline tab |
 | Marketplace Schema (V2 prep) | **DONE** | Full deal pipeline (11 stages), allocations, listings |
 | Audit Logging | **DONE** | 39 events, SHA-256 hash-chained, immutable |
-| Tracking + Monitoring (18 tools) | **DONE** | Rollbar, Tinybird, PostHog, Vercel Web Analytics, Vercel Speed Insights |
+| Tracking + Monitoring (18 tools) | **DONE** | Rollbar, PostHog, Vercel Web Analytics, Vercel Speed Insights |
 | Email Notifications | **DONE** | 7 email templates via Resend |
-| Dual-Database Backup | **DONE** | Supabase + Replit Postgres |
+| Dual-Database Backup | **DONE** | Supabase + Backup PostgreSQL |
 | CI/CD Pipeline | **DONE** | 4 GitHub Actions workflows |
 | KYC Provider System | **DONE** | 3 adapter stubs (Parallel Markets, Plaid, VerifyInvestor) |
 | Brand Guidelines v1.1 | **DONE** | Logo PNGs across all portals, brand colors, icon assets |

@@ -121,7 +121,7 @@ async function insertWatermark(
   const { width, height } = page.getSize();
 
   // Safely replace template variables with whitelisted values only
-  const rawWatermarkText = safeTemplateReplace(config.text, viewerData);
+  const rawWatermarkText = safeTemplateReplace(config.text, viewerData as unknown as Record<string, string>);
 
   // Handle Unicode characters that can't be encoded in WinAnsi
   const sanitizeText = (text: string): string => {

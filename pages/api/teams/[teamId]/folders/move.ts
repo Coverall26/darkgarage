@@ -4,9 +4,11 @@ import { authOptions } from "@/lib/auth/auth-options";
 import slugify from "@sindresorhus/slugify";
 import { getServerSession } from "next-auth/next";
 
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { reportError } from "@/lib/error";
+import { FoldersBulkMoveSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -21,11 +23,13 @@ export default async function handle(
     }
     const userId = (session.user as CustomUser).id;
     const { teamId } = req.query as { teamId: string };
-    const { folderIds, selectedFolder, selectedFolderPath } = req.body as {
-      folderIds: string[];
-      selectedFolder: string | null;
-      selectedFolderPath: string;
-    };
+    const parsed = validateBodyPagesRouter(req.body, FoldersBulkMoveSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { folderIds, selectedFolder, selectedFolderPath } = parsed.data;
 
     // Ensure the user is an admin of the team
     const teamAccess = await prisma.userTeam.findUnique({

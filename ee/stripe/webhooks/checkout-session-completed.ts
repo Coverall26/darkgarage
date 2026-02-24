@@ -46,9 +46,6 @@ export async function checkoutSessionCompleted(
   const subscriptionEnd = new Date(subscription.current_period_end * 1000);
   const quantity = subscription.items.data[0].quantity;
 
-  console.log("subscription", subscription);
-  console.log("subscription items", subscription.items.data);
-
   const plan = getPlanFromPriceId(priceId, isOldAccount);
 
   if (!plan) {

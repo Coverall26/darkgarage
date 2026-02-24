@@ -1,6 +1,5 @@
 import { NextApiRequest } from "next";
 import prisma from "@/lib/prisma";
-import { recordSignatureEvent } from "@/lib/tinybird/publish";
 import { userAgentFromString } from "@/lib/utils/user-agent";
 import { getIpAddress } from "@/lib/utils/ip";
 
@@ -22,7 +21,7 @@ export interface SignatureAuditData {
   event: SignatureEventType;
   recipientId?: string | null;
   recipientEmail?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   pageNumber?: number | null;
   actionDuration?: number | null;
   sessionId?: string | null;
@@ -39,7 +38,6 @@ export async function logSignatureEvent(
     
     const ua = userAgentFromString(userAgent);
     
-    // @ts-ignore - Prisma types may need regeneration after schema changes
     const auditLog = await prisma.signatureAuditLog.create({
       data: {
         documentId: data.documentId,
@@ -62,34 +60,6 @@ export async function logSignatureEvent(
         pageNumber: data.pageNumber || null,
       },
     });
-
-    if (process.env.TINYBIRD_TOKEN && auditLog?.id) {
-      try {
-        await recordSignatureEvent({
-          timestamp: new Date().toISOString(),
-          event_id: auditLog.id,
-          document_id: data.documentId,
-          event: data.event,
-          recipient_id: data.recipientId || null,
-          recipient_email: data.recipientEmail || null,
-          ip_address: ipAddress || null,
-          session_id: data.sessionId || null,
-          page_number: data.pageNumber || null,
-          action_duration: data.actionDuration || null,
-          device: ua.device?.type || "Desktop",
-          device_model: ua.device?.model || "Unknown",
-          device_vendor: ua.device?.vendor || "Unknown",
-          browser: ua.browser?.name || "Unknown",
-          browser_version: ua.browser?.version || "Unknown",
-          os: ua.os?.name || "Unknown",
-          os_version: ua.os?.version || "Unknown",
-          ua: userAgent || "Unknown",
-          referer: referer,
-        });
-      } catch (tbError) {
-        console.warn("Failed to send signature event to Tinybird:", tbError);
-      }
-    }
 
     return;
   } catch (error) {

@@ -1,84 +1,45 @@
 # FundRoom.ai — Claude Code System Prompt
 
-You are building **FundRoom.ai**: a multi-tenant, security-first, modular fund + investor operations SaaS platform. Code name: **DarkRoom**.
+You are building **FundRoom.ai**: a multi-tenant, security-first, modular fund + investor operations SaaS platform.
 
 ## CRITICAL CONTEXT
-The platform launches **NEXT WEEK**. First tenant: seeded via `prisma/seed-bermuda.ts`. Build continuously until MVP is complete.
-**Note:** All hardcoded BFG/Bermuda domain references have been removed from the platform framework (Feb 9, commit `bcea74f3`). The platform is now fully env-driven — see "BFG Reference Removal" section below.
+The platform is **production-ready** and deployed on Vercel. First tenant: seeded via `prisma/seed-bermuda.ts`.
+**Note:** All hardcoded BFG/Bermuda domain references have been removed from the platform framework (Feb 9, commit `bcea74f3`). The platform is fully env-driven — see "BFG Reference Removal" section below.
 
 ## DEMO CREDENTIALS (Development/Staging)
-- **GP Login:** joe@bermudafranchisegroup.com / FundRoom2026!
-- **LP Login:** demo-investor@example.com / Investor2026!
-- **Admin Login:** rciesco@fundroom.ai / (see ADMIN_TEMP_PASSWORD secret)
+- **GP Login:** joe@bermudafranchisegroup.com / (see `GP_SEED_PASSWORD` env var)
+- **LP Login:** demo-investor@example.com / (see `LP_SEED_PASSWORD` env var)
+- **Admin Login:** rciesco@fundroom.ai / (see `ADMIN_TEMP_PASSWORD` env var)
 - **Dataroom URL:** /d/bermuda-club-fund
+- **Note:** All demo passwords are set via environment variables. See `.env.example` for defaults. Never commit real credentials.
 
 ## REFERENCE DOCUMENTS
 All specs live in `/docs/`:
 - `FundRoom_Master_Plan_v13.md` — Complete specification v13 (24 sections). THE source of truth.
-- `FundRoom_Claude_Code_Handoff.md` — Build order, schema, architecture, system prompt.
 - `FundRoom_Brand_Guidelines.md` — Colors, typography, logo usage, UX principles.
-- `BUG_MONITORING_TOOLS_REPORT.md` — Complete inventory of all 18 monitoring/testing/debugging tools.
 - `TRACKING_AND_MONITORING.md` — Tracking, monitoring & error reporting architecture.
-- `DUAL_DATABASE_SPEC.md` — Dual-database backup architecture (Supabase primary + Replit backup).
-- `DATABASE_SETUP.md` — Database setup, migrations, seeding guide. Covers Prisma configuration (137 models, ~5,670 lines, 89 enums), migration workflow (28 migrations), 4 seed scripts (Bermuda tenant, platform admin, data import, test data), dual-database architecture, health endpoints, AES-256 encryption for sensitive fields, Vercel production config, and troubleshooting.
-- `SANDBOX_TESTING.md` — Sandbox testing & webhook simulation guide. Covers Plaid (Phase 2, 503 in MVP), Persona (KYC/AML with HMAC-SHA256 webhooks), Stripe (CRM billing with CLI webhook forwarding + separate CRM webhook at `/api/webhooks/stripe-crm`), Resend (transactional email), 5 storage providers, Tinybird/Rollbar/PostHog analytics, Google OAuth dual credentials, Jest 30 test infrastructure (167 test files, 5,873+ tests, 40+ global mocks), and webhook simulation with curl examples.
+- `DUAL_DATABASE_SPEC.md` — Dual-database backup architecture (Supabase primary + optional backup).
+- `DATABASE_SETUP.md` — Database setup, migrations, seeding guide. Covers Prisma configuration (140 models, ~5,799 lines, 91 enums), migration workflow (32 migrations), 4 seed scripts (Bermuda tenant, platform admin, data import, test data), database architecture, health endpoints, AES-256 encryption for sensitive fields, Vercel production config, and troubleshooting.
+- `SANDBOX_TESTING.md` — Sandbox testing & webhook simulation guide. Covers Plaid (Phase 2, 503 in MVP), Persona (KYC/AML with HMAC-SHA256 webhooks), Stripe (CRM billing with CLI webhook forwarding + separate CRM webhook at `/api/webhooks/stripe-crm`), Resend (transactional email), 5 storage providers, Rollbar/PostHog analytics, Google OAuth dual credentials, Jest 30 test infrastructure (196 test files, 5,800+ tests, 40+ global mocks), and webhook simulation with curl examples.
 - `FundRoom_Raise_Types_Research.md` — **v2.0** Complete fundraising structures & capital flow reference aligned with GP Wizard Plan v1.0 + SEC Compliance Requirements v1.0. Covers SAFE, Convertible Notes, Priced Equity Rounds, SPVs, Rolling Funds (Startup Mode) and VC, PE, Real Estate, Hedge, Fund of Funds, Search Fund (GP Fund Mode). Includes capital flow diagrams, distribution waterfall mechanics (European & American), key metrics (IRR, TVPI, DPI, RVPI, MOIC, NAV), document matrix by raise type, UX screen mapping, and SEC Form D field mapping. Read this to understand what data each raise type needs to track.
-- `Claude_Code_Build_GP_LP_Wizards.md` — **v2.0** Complete build instructions for GP Onboarding Wizard (9 steps) + LP Onboarding Wizard (6 steps). Includes file structure, step-by-step field mappings to Prisma models, SEC compliance requirements (Rule 506(b)/506(c), Form D, Bad Actor certification, accreditation verification), API route specs, Zod validation schemas, and codebase conventions. References `components/showcase/fundroom-wizard.jsx` as the UI reference. **Read this before building or modifying any wizard step.** Aligned with GP Wizard Plan v1.0 + SEC Compliance Requirements v1.0.
-- `Raise_Wizard_LP_Onboarding_Components.md` — Component inventory and integration guide for the Raise Creation Wizard (5-step) and LP Onboarding Wizard (6-step). Lists all types, hooks, shared components, and step files. Includes API endpoints needed, smart defaults by fund type, and key UX design decisions (one CTA per screen, auto-save, mobile-first, brand-configurable). Read this before building or modifying any wizard/onboarding flow.
-- **Showcase Components** (`components/showcase/`) — Pre-built UI reference components for building production features:
-  - `dashboard-showcase.jsx` (685 lines) — GP Dashboard animated showcase with sidebar nav, stats cards, tranche pipeline chart, investor table, activity feed, and live notification animations. Marketing asset that auto-plays through dashboard features. Contains data structures for tranches, investors, activity items, and animated number/bar components.
-  - `fundroom-wizard.jsx` (1,716 lines) — Complete GP Org Setup Wizard (8 steps) + LP Onboarding Wizard (6 steps) with all shared UI components (Badge, Button, Input, Select, Toggle, Checkbox, Card, Alert, FileUploadZone, etc.). Contains full form implementations for company info, branding, raise style, dataroom, fund details, LP onboarding settings, integrations, and launch. Also includes LP steps: account, NDA signing, accreditation, investor details, commitment, and funding. Full documentation with Claude Code integration prompt available at `docs/GP_LP_Wizard_Reference.md`.
-  - `tranche-pricing-chart.jsx` (518 lines) — Interactive tranche pricing visualization with 3 view modes (unit price, units available, cumulative raise), animated bars, hover tooltips, status badges (filled/active/locked), and summary stats table. Uses Bermuda Club Fund I data (5 tranches, $9.55M target).
-- `FundRoom_MVP_Reference.md` — Standalone MVP reference (42 files, 6,089 lines). Contains complete GP flow (8-step wizard, dashboard, investor management), LP flow (6-step onboarding, portal), FundRoom Sign e-signature, SEC compliance features, and seed data for Bermuda Club Fund I. Use as a reference for building out remaining features — do NOT directly copy code (existing codebase has more advanced implementations). Demo credentials: GP: joe@bermudafranchisegroup.com / FundRoom2026!, LP: demo-investor@example.com / Investor2026!.
 - `GITHUB_ACTIONS_GUIDE.md` — CI/CD pipeline rules and debugging guide.
-- `NAMING_MIGRATION.md` — BFFund → FundRoom naming migration history, salt changes, file manifest.
-- `SESSION_SUMMARY_FEB9_2026.md` — Feb 9 session summary: domain architecture, GitHub sync, doc refresh.
-- `SESSION_SUMMARY_FEB10_2026.md` — Feb 10 session summary: brand guidelines, security fixes, analytics.
-- `SESSION_SUMMARY_FEB11_2026.md` — Feb 11 session summary: security hardening, custom branding, wire workflow, 9 PRs merged, middleware static asset fix, cookie security audit (all cookies now have Secure flag), error monitoring review.
-- `SESSION_SUMMARY_FEB12_2026.md` — Feb 12 session summary: test assertion fixes, PR #90 integration (59 TS errors), Rollbar test noise fix, code audit marathon merge (65 files), 13 TS errors from audit merge fixed, Vercel build fix (Next.js 16 params), PR #97/#98 merged, H-06 error response standardization (~292 files across two passes), paywall logic (free dataroom vs paid FundRoom), OAuth conditional rendering, full systems test (second pass: 175 missed error responses across 63 files), paywall mock additions to 4 test files, branch cleanup (7 branches).
-- `SESSION_SUMMARY_FEB13_AM_2026.md` — Feb 13 morning/early session (parallel Claude agent): LP Registration auth gap fix (one-time login token), Subscribe API NDA/accreditation guard fix, ee/features H-06 third pass (~333 files total), Dataroom→Invest→LP parameter chain fix (P0-4), Production DB schema sync (8 tables, 36+ columns), signedFileUrl column (P0-5), GP pending actions inline resolution (P1-8), LP document upload E2E fixes (P1-9), Startup Raise Type wizard (SAFE/Conv Note/Priced/SPV), LP Onboarding Settings step (+11 OrganizationDefaults columns), comprehensive codebase review. ~15 new files, 2 migrations. Platform at ~92-95% completion.
-- `SESSION_SUMMARY_FEB13_PM_2026.md` — Feb 13 PM session: branch cleanup (1 stale branch deleted), Vercel secrets consolidation, synced PRs #129–132 (raise wizard + startup wizard + LP onboarding settings), fixed 14 TS errors (Prisma regeneration), added MVP reference doc and wizard components doc with demo credentials across all key files.
-- `SESSION_SUMMARY_FEB13_EVE_2026.md` — Feb 13 evening session: FundRoomSign consolidated e-signature component (Prompt 10), GP Approval Queue dashboard (Prompt 11), Manual Investor Entry enhancements with lead matching + installments + accreditation options (Prompt 12). 14 new files, 2 modified. 8 new API routes.
-- `SESSION_SUMMARY_FEB14_2026.md` — Feb 14 session (6+ hours, 13 commits, PRs #137–#145): Investor Entity Architecture (7 entity types, 69KB component), Wire Transfer Payment MVP (FundingStep + GP confirmation + proof upload), Manual Document Upload + GP Confirmation (ExternalDocUpload, GPDocReview, GPDocUpload + 4 API routes), Regulation D exemption selector, FundTypeSelector card UI + PATCH fund endpoint, Document Template Manager admin integration, org-setup error standardization, INITIALS PDF flattening fix, deep repo analysis, fix sprint (P0-P2 issues), GP/LP SEC compliance (506(c) accreditation + 8 representations), manual investor entry wizard rewrite, Next.js 16 middleware.ts conflict resolution + file sync. 18 new files, 20+ modified, 2 deleted. 5 Prisma migrations. Platform at ~96-97% completion.
-- `SESSION_SUMMARY_FEB15_2026.md` — Feb 15 session (~14 hours, 6 non-merge commits + 18 file syncs): GP Onboarding Wizard V2 (8 steps, 25 new files, 5,515 lines at /admin/setup), 4 LP API routes (App Router), GP Investor Review page (999 lines), Prompt 7/8 audit fixes (PR #150, document reject endpoint, PROOF_UPLOADED status), security hardening sprint (verify-link race condition, engagement multi-tenant bypass, cookie centralization, silent error swallowing), fundraising wizard enhancements (SEC exemption expansion to 4 types, dark mode fixes). 1 Prisma migration (+27 fields). Platform at ~97-98% completion.
-- `SESSION_SUMMARY_FEB16_2026.md` — Feb 16 session: Deep Project Review update, GP Setup Wizard V1→V2 merge verification (all 12 files reviewed), 4 issues found & fixed (Reg A+/Rule 504 missing from Step3RaiseStyle, WizardData type expansion, Step8Launch label update, Step2Branding logo upload error feedback), codebase metrics refresh (1,932 files, 383K lines, 439 API routes, 146 test files, 5,210+ tests). Platform at ~98-99% completion.
-- `SESSION_SUMMARY_FEB17_LATE_2026.md` — Feb 17 late session: GP/LP Dashboard UI polish sprint (Prompts 8-17). GP Dashboard (layout, sidebar, home, investors, analytics, fund mgmt), LP Dashboard (layout, home, docs vault, transactions), Settings Center (full hydration + per-section save + team CRUD with 48 new tests), UI/UX polish (skeleton loaders, progress bar, clear filters), LP docs JSX fix. Platform at ~99% completion.
-- `SESSION_SUMMARY_FEB18_P0_SPRINT_2026.md` — Feb 18 P0 Launch Blocker Sprint: 6 launch blockers resolved (Plaid gating, error boundaries, fund settings API, Prisma client hardening, comprehensive rate limiting audit across 40+ endpoints with App Router support). 0 TS errors, 147 suites, 5,421 tests.
-- `SESSION_SUMMARY_FEB18_POLISH_SPRINT_2026.md` — Feb 18 Production Polish Sprint: 18-prompt build (P1-1 through P3-6). GP Dashboard polish, LP Dashboard polish, Settings Center, Investor Detail Page, Email Notification wiring, Responsive Design audit, E2E integration tests, Seed Data & Demo Mode, Wire Transfer hardening, Document Template System, Reports & Analytics, Audit Log Dashboard, Deployment Readiness, Performance Optimization, Accessibility (WCAG 2.1 AA), SEC Compliance verification, Error Handling standardization, Production Smoke Tests (20 tests). 153 suites, 5,559 tests.
-- `SESSION_SUMMARY_FEB18_UIUX_GAP_SPRINT_2026.md` — Feb 18 UI/UX Gap Analysis Sprint: 9-gap remediation against v12 spec. DashboardHeader integrated into admin layout (persistent search/notifications/user menu), sidebar width 240px, main content max-width 1440px, tablet collapsed sidebar (768-1023px), LP brand color on active nav states, Quick Actions Bar on GP dashboard, LP Bottom Tab Bar self-sufficient with badge counts (new pending-counts API), LP Visibility dedicated settings tab, keyboard shortcuts (⌘K search, Escape close). 7 modified + 1 new file.
-- `SESSION_SUMMARY_FEB18_UIUX_POLISH_SPRINT_2026.md` — Feb 18 UI/UX Polish Sprint: 11-prompt build continuing v12.1 gap analysis. Component extraction (GP Dashboard 1143→429 lines, Fund Detail 1271→834 lines, LP Dashboard 1704→1451 lines, 7 new components), skeleton loaders on 4 pages (replacing spinners), SSE infrastructure (event-emitter + streaming endpoint + useSSE hook), TabKey TS fix, boolean coercion fix. 32 files changed, 2242 insertions, 1508 deletions.
-- `SESSION_SUMMARY_FEB18_CLEANUP_SPRINT_2026.md` — Feb 18 Codebase Cleanup & Security Hardening Sprint: orphaned file audit (43 files verified already deleted), fast-xml-parser removal (npm vulns 37→10), npm audit fix (markdown-it + qs patched). 0 TS errors, 10 moderate vulns remaining (all eslint dev toolchain).
-- `SESSION_SUMMARY_FEB18_SECURITY_HARDENING_2026.md` — Feb 18 Security Hardening Sprint (session 6): Verified all 42 orphaned files already deleted, removed fast-xml-parser direct dependency, added rate limiting to 3 remaining unprotected routes (documents/upload, browser-upload, mfa-verify upgraded to 5/15min), added blanket middleware rate limiting (200 req/min/IP via proxy.ts + Upstash Redis), deleted orphaned test file. 0 TS errors, 152 suites, 5,540 tests passing.
-- `SESSION_SUMMARY_FEB19_UIUX_DEPLOY_2026.md` — Feb 19 UI/UX Deployment Preparation Sprint: Unified dual navigation (AppSidebar→AdminSidebar in AppLayout, ~45 pages affected), fixed double-sidebar on 4 admin pages, verified first-run experience (signup→wizard→dashboard), fixed 5 orphaned /settings/* links, verified LP polish (wire copy, mobile signing, progress tracker all complete), added Settings gear icon on fund list table and dashboard raise card with deep-link to settings page. 12 files modified, 0 new TS errors.
-- `SESSION_SUMMARY_FEB19_AUDIT_SPRINT2_2026.md` — Feb 19 Audit Sprint 2: silent catch fixes, 25 CRM TypeScript errors, SSE event wiring, notification preferences API, marketplace APIs, Phase 2 schema additions.
-- `SESSION_SUMMARY_FEB19_AUDIT_REMEDIATION_2026.md` — Feb 19 Repo Audit & Gap Analysis Remediation Sprint: 7 audit items resolved (1.2 CSP route conflict verified, 1.3 cascade deletes verified, 1.4 H-06 error standardization 5 violations fixed, 1.5 silent catch blocks 16 files fixed with Rollbar reporting, 1.6 BFG placeholder cleanup 2 values fixed, 1.7 tsconfig verified). Bonus: 7 pre-existing TypeScript errors fixed. 0 TS errors, 22 files modified.
-- `SESSION_SUMMARY_FEB19_CRM_AUDIT_2026.md` — Feb 19 CRM Build-Readiness Audit Sprint: 7-gap remediation (PendingContact fallback in all auto-capture flows, Stripe invoice.payment_failed/paid/subscription.created webhook handlers, Contact→InvestorProfile linking in LP registration, dataroom/schema/CRM page/Settings Center verified complete). 18 new webhook tests + 5 ContactLimitError tests. 324 CRM tests across 10 suites. Bug fixes: publishServerEvent field name, ContactLimitError mock, non-blocking CRM capture in LP register.
-- `SESSION_SUMMARY_FEB19_CRM_ROLES_2026.md` — Feb 19 CRM Role Enforcement & Build-Readiness Audit (Sections 5.3–9.3): 3-level CRM role system (VIEWER/CONTRIBUTOR/MANAGER) with Prisma enum, resolution logic, enforcement middleware on all CRM API routes, team management UI, client-side gating. ContactSidebar improvements (follow-up picker, tag removal, error reporting). Pipeline stage fix (4 FREE vs 5 FUNDROOM). CAN-SPAM compliance footer. AI Outreach Engine verified. Email template limits verified. E-signature cap UX verified. 46 CRM role tests. 23 files changed, 5 new files.
-- `SESSION_SUMMARY_FEB20_UIUX_PHILOSOPHY_2026.md` — Feb 20 UI/UX Design Philosophy Implementation Sprint: Outreach Center (4 tabs, 1,336 lines), AI Assistant FAB (329 lines), copy dataroom link in Quick Actions, AI toggle in dashboard header, sidebar navigation update. Pre-existing CRM role test failures fixed (3 suites, 33 tests). 175 suites, 5,050 tests all passing.
-- `SESSION_SUMMARY_FEB20_LAUNCH_SPRINT_2026.md` — Feb 20 Launch Sprint (Prompts 5-9): LP onboarding polish (VISIBLE_STEPS ordering, entity before NDA, Landmark icon), empty states on CRM/analytics/approvals pages with loading skeletons, responsive design verification (all complete), Settings Center beforeunload handler, Phase 2 feature gating (Plaid bank/status 503, ACH Coming Soon card, Persona KYC badge). 8 files modified, 192 insertions, 24 deletions.
-- `SESSION_SUMMARY_FEB21_2026.md` — Feb 21 session: Document Template HTML Merge Field System (P1-5 complete: 23-field merge engine, template renderer, entity auto-fill, default NDA/Sub Ag HTML templates, DocumentTemplate model + migration + seed). Funding Round/Tranche Configuration: Wizard Funding Structure UI (Step 6 dual-mode collapsible section for STARTUP planned rounds + GP_FUND pricing tiers), WizardData extensions (plannedRounds + initialTiers arrays), setup/complete API updates (create planned rounds + pricing tiers), seed data (5 demo rounds Pre-Seed→Series C), fund-mode API field name bug fix, gp-wizard-merge test fixes (auth mock migration to requireAuthAppRouter). Test fixes: merge-fields test updated for 23 fields, lp-token-login `$transaction` mock added. Wire proof error reporting improved. P1-1/P1-3/P1-4/P1-6 verified already complete. 182 suites, 5,201 tests, 0 TS errors.
-- `SESSION_SUMMARY_FEB22_2026.md` — Feb 22 session: Admin Auth Edge Middleware implementation. Created `lib/middleware/admin-auth.ts` (196 lines) with `enforceAdminAuth()` and `applyAdminAuthHeaders()` for edge-compatible JWT session validation. Modified `proxy.ts` with two enforcement blocks (API routes + page routes). Comprehensive test suite (`__tests__/middleware/admin-auth.test.ts`, 480 lines, 30+ tests). Admin route audit verified all 55+ routes compatible. Defense-in-depth: edge JWT validation + LP blocking before route handlers. 2 new files, 1 modified.
-- `GP_LP_Wizard_Reference.md` — Production-ready GP/LP React Wizard reference document (1,754 lines). Contains complete JSX implementation for GP Onboarding Wizard (8 steps: Company Info, Branding, Raise Style, Dataroom, Fund Details, LP Onboarding, Integrations, Launch) and LP Onboarding Flow (6 steps: Account, NDA, Accreditation, Investor Details, Commitment, Funding). Includes all SEC compliance (506(b)/506(c) logic, March 2025 no-action letter thresholds, bad actor certification, Form D data capture, 8 investor representations, audit trail fields). Also includes shared UI components (Badge, Button, Input, Select, Toggle, Checkbox, Card, Alert, FileUploadZone, etc.), brand constants, and Claude Code integration prompt. Use as the canonical reference for wiring wizard steps to the Next.js backend.
-- `CODEBASE_REVIEW_FEB13_2026.md` — Feb 13 comprehensive codebase review: build config, architecture patterns, security posture, feature completion (~92-95%), remaining work.
-- `DEEP_REPO_ANALYSIS_FEB14_2026.md` — Feb 14 deep repository analysis: build configuration, test infrastructure, security posture, schema completeness (117 models, 4,134 lines), code quality metrics, feature completion (~96-97%), remaining work items.
-- `DEEP_PROJECT_REVIEW_FEB16_2026.md` — Feb 16 updated deep project review: GP Setup Wizard V1→V2 merge verification, all review items confirmed against codebase, metrics update (1,932 files, 383K lines, 439 API routes), Reg A+/Rule 504 fix in V2 wizard, logo upload error fix, 4 issues found & fixed, recommendations. Platform at ~98-99% completion.
-- `CODE_REVIEW_FEB17_2026.md` — Feb 17 deep code review: 16 issues (3 CRITICAL, 5 HIGH, 8 MEDIUM) all fixed. tsconfig exclusion, CSP route conflict, cascade deletes→Restrict, H-06 standardization, orphaned components deleted, rate limiting added, silent error swallowing fixed, 9 new typed enums, relation/index additions. 0 TS errors, 147 suites, 5,420 tests passing.
-- `SESSION_SUMMARY_FEB17_CODEREVIEW_2026.md` — Feb 17 code review & cleanup session: merged 2 Claude Code branches (audit report + 16 fixes across 69 files), resolved 171 TS errors (WizardData interface expansion with 80+ fields, enum value corrections), Tailwind CSS cache fix (deleted orphaned components breaking CSS compilation), BFG customer asset cleanup (22 dead files removed from `public/`), asset storage architecture documented (platform=public/, customer=cloud storage via Brand model). Full project sync to GitHub via smart diff (109 files pushed, PR #165 merged).
-- `PAGES_TO_APP_ROUTER_MIGRATION.md` — Pages Router → App Router migration plan and status. Phase 1 complete (Feb 19): 99 new App Router routes created (27 LP + 56 admin + 5 fund + 11 auth). Pattern reference (auth, response, method handling, body parsing, webhooks, cookies/redirects, rate limiting). Phase 2 remaining: ~222 routes (teams, links, file, sign, webhooks, jobs). Pages Router files kept during verification.
-- `CODE_AUDIT_REMEDIATION_PLAN.md` — Verified code audit findings and remediation status.
-- `ERROR_RESPONSE_STANDARDIZATION_PLAN.md` — H-06 error response standardization: `{ message }` → `{ error }` across all API endpoints. Two passes: original branch (~225 files) + second pass (175 missed responses across 63 files) + third pass (41 ee/features files, Feb 13). Includes post-merge fix section (9 TS errors), second pass documentation (targeted sed approach, paywall mock pattern for tests), and lessons learned.
-- `API_REFERENCE.md` — Consolidated API route index (~436 routes) organized by domain: auth, LP, GP/admin, funds, documents, signatures, wire, approvals, dataroom, marketplace, billing, webhooks. Includes common patterns (auth, team scoping, error responses, pagination).
-- `API_ROUTE_INVENTORY.md` — Complete API route inventory (593 routes: 379 Pages Router + 214 App Router). Executive summary with auth coverage (86%), rate limiting architecture (7 tiers from blanket 200/min to strict 3/hr), multi-tenant isolation audit. Routes organized by 20+ feature domains. Security audit summary. Generated Feb 20, 2026.
-- `ENV_VARS.md` — Complete environment variable reference (~200 vars across 20 categories). Production deployment checklist. Cross-referenced against all `process.env.*` usage in codebase. Covers: Authentication, Database, Email (Resend + Unsend), Storage, Monitoring, Billing (SaaS + CRM), KYC, Encryption, Domain, E-Signature, Redis & Rate Limiting, AI & OpenAI, Feature Flags, and more.
-- `LAUNCH_CHECKLIST.md` — Pre-launch verification checklist: environment (11 items), security (16), GP flow (16), LP flow (13), dataroom (7), performance (8), monitoring (6), data (6), accessibility (6). Post-launch: Day 1 (9 items), Week 1 (6 items).
-- `RUNBOOK.md` — Operational runbook for platform administrators. 12 scenarios with step-by-step procedures: Add GP Org, Reset LP Onboarding, Confirm Wire Transfer, Export Fund Data, Rotate Encryption Keys, Run Migrations, Rollback Deployment, Investigate Email Issues, Check Audit Logs, Manage Platform Settings, Troubleshoot Health Checks, Manage CRM Billing.
-- `DEPLOYMENT.md` — Standalone deployment guide: Vercel project config, env var checklist (108 vars), domain setup, database setup, deployment procedures, rollback, health checks, troubleshooting, uptime monitoring configuration.
-- `ARCHITECTURE.md` — Focused architecture reference: system overview diagram, multi-tenant isolation, auth flow, settings inheritance, data flow diagrams (GP fund creation, LP investment, e-signature), paywall architecture, email architecture, audit trail architecture, directory structure, tech stack.
-- `SEC_COMPLIANCE.md` — Consolidated SEC compliance reference: Regulation D exemptions (506(b)/506(c)/Reg A+/Rule 504), investor accreditation criteria by entity type, Form D data capture fields, Bad Actor 506(d) certification, 8 investor representations, e-signature ESIGN/UETA compliance, immutable audit trail, data retention policies.
-- `LP_ONBOARDING_FLOW.md` — Complete LP onboarding wizard documentation: 7-step walkthrough with decision trees, parameter chain (dataroom → invest → onboard), paywall gates, auto-heal mechanisms (subscribe API, register API flag upgrade, one-time token), post-onboarding lifecycle (auto-save, post-approval change detection), edge cases (multi-fund, existing user, mobile), key files.
-- `OFFERING_LANDING_PAGE_GUIDE.md` — Offering landing page comparison guide: existing `app/offering/[slug]/page-client.tsx` (production, API-driven, TypeScript, 15+ components) vs `offering-landing-page-template.jsx` (premium design reference, scroll animations, parallax, EB Garamond/DM Sans fonts). Integration plan with 14 prioritized upgrades, data mapping table, and design tokens.
-- `ESIGN_VAULT_FEATURE_SPEC.md` — **v1.0** E-Signature Platform & Document Vault feature specification. Three-horizon strategy (MVP → Full Platform → DocuSign Competitor). Covers: current state audit (5,200+ lines, 6 schema models, 10 field types), Phase 2 features (drag-drop field editor, bulk send, template library, reminders, analytics, external signers, partner vault), Phase 3 features (standalone signing, workflow automation, white-label SDK, embed API). Includes UI/UX flows, technical architecture, competitive analysis (vs DocuSign/PandaDoc), pricing tiers, and roadmap.
-- `offering-landing-page-template.jsx` — **Premium design template** for the offering landing page. 1,647-line JSX reference with: scroll-based IntersectionObserver animations, parallax hero grid, dynamic sticky nav with opacity, mobile hamburger overlay, gold accent (#C9A84C) design language, accredited investor email gate, gated/open document badges. Use this as the visual design target when upgrading `app/offering/[slug]/page-client.tsx`.
+- **Session Summaries** — 28 session summaries (Feb 9–22, 2026) archived in `docs/archive/sessions/`. Detailed build logs covering every sprint from foundation through production readiness.
+- `GP_LP_Wizard_Reference.md` — Production-ready GP/LP React Wizard reference (1,754 lines). GP Wizard (8 steps) + LP Flow (6 steps) with SEC compliance, shared UI components, brand constants.
+- `PAGES_TO_APP_ROUTER_MIGRATION.md` — Pages Router → App Router migration plan. Phase 1 complete (99 routes). Phase 2 remaining (~222 routes).
+- `AUDIT_REPORT.md` — Codebase audit report and findings.
+- `API_REFERENCE.md` — Consolidated API route index (~436 routes) organized by domain.
+- `API_ROUTE_INVENTORY.md` — Complete API route inventory (593 routes). Auth coverage (86%), rate limiting architecture, multi-tenant isolation audit.
+- `ENV_VARS.md` — Complete environment variable reference (~200 vars across 20 categories).
+- `LAUNCH_CHECKLIST.md` — Pre-launch verification checklist (98 items across 9 categories).
+- `RUNBOOK.md` — Operational runbook (12 procedures).
+- `DEPLOYMENT.md` — Vercel deployment guide, env vars, domain setup, health checks.
+- `ARCHITECTURE.md` — System architecture, multi-tenant isolation, data flows, paywall, email, audit trail.
+- `SEC_COMPLIANCE.md` — Regulation D, accreditation, Form D, ESIGN/UETA compliance, audit trail.
+- `LP_ONBOARDING_FLOW.md` — LP onboarding wizard documentation with decision trees and edge cases.
+- `OFFERING_LANDING_PAGE_GUIDE.md` — Offering landing page comparison guide and upgrade plan.
+- `ESIGN_VAULT_FEATURE_SPEC.md` — E-Signature Platform & Document Vault Phase 2/3 feature spec.
+- `SECRETS_AUDIT.md` — Secrets scan results (10 pattern checks, all PASS), credential management patterns, .gitignore coverage, encryption architecture table (7 purposes + env vars + algorithms).
+- `ENCRYPTION_AUDIT.md` — Full audit of all 9 encryption implementations (AES-256-GCM, SHA-256, HMAC). Verification checklist for 14 sensitive data types. Required env vars for production.
 
 **Root-level documentation:**
 - `SECURITY.md` — GitHub security policy: vulnerability reporting, encryption standards (AES-256), authentication methods, RBAC, rate limiting, security headers, audit trail, data classification, compliance overview, infrastructure security, incident response.
@@ -87,20 +48,10 @@ All specs live in `/docs/`:
 
 Read them. Follow them exactly.
 
-## GITHUB REPOSITORY — HARD RULES (NEVER VIOLATE)
-
-> **ABSOLUTE RULE: ALL GitHub operations MUST use the GitHub REST API with `GITHUB_PAT`.**
-> **NEVER use `git push`, `git pull`, `git fetch`, `git clone`, or any direct git commands for remote operations.**
-> **NEVER use the Replit git integration for pushing/pulling.**
-> **The ONLY way to interact with GitHub is via the REST API.**
+## GITHUB REPOSITORY
 
 - **Repo**: `Darkroom4/darkroom` (private). NOT `BermudaClub/darkroom` (old org).
-- **Token**: `GITHUB_PAT` secret — personal access token with full `repo` scope.
-- **Push**: Use GitHub Git Data API (create blobs → create tree → create commit → update ref). Use Python `urllib` or `curl` with `Authorization: token $GITHUB_PAT`.
-- **Pull**: Download tarball via `GET https://api.github.com/repos/Darkroom4/darkroom/tarball/main`, extract, sync files.
-- **Delete files**: Use Contents API `DELETE /repos/Darkroom4/darkroom/contents/{path}`.
-- **Local git remote**: Points to wrong org (`BermudaClub`). Replit blocks `.git/config` edits. Ignore it entirely — always use the API.
-- **Why this rule exists**: Direct git commands are blocked by Replit, and the local remote is wrong. The GitHub REST API with `GITHUB_PAT` is the only method that works reliably.
+- **Branch strategy**: Feature branches off `main`, merge via PR.
 
 ## GOOGLE OAUTH — DUAL CREDENTIAL SYSTEM (Feb 9, 2026)
 Authentication uses a primary/fallback pattern for Google OAuth during migration from BFG to FundRoom:
@@ -123,29 +74,24 @@ Authentication uses a primary/fallback pattern for Google OAuth during migration
 
 ## TECH STACK
 - **Frontend:** Next.js 16 App Router + shadcn/ui + Tailwind CSS
-- **Backend:** Next.js API routes + NextAuth (email/password, Google OAuth)
-- **Database:** Prisma ORM + PostgreSQL (Supabase primary + Replit Postgres backup)
-- **Storage:** S3 + CloudFront (KMS-encrypted, per-org prefixes) + Replit Object Storage
+- **Backend:** Next.js API routes (218 App Router + 293 Pages Router) + NextAuth (email/password, Google OAuth)
+- **Database:** Prisma ORM + PostgreSQL (Supabase), 140 models, 91 enums, 5,799 lines, 32 migrations
+- **Storage:** AWS S3, Cloudflare R2, Vercel Blob (KMS-encrypted, per-org prefixes)
 - **Email:** Resend (transactional + notifications, org-branded)
-- **E-Signature:** FundRoom Sign (NATIVE, self-hosted, zero external API cost)
+- **E-Signature:** FundRoom Sign (native, zero external API cost)
 - **Billing:** Stripe Billing — CRM subscriptions (FREE/CRM_PRO/FUNDROOM + AI_CRM add-on), SaaS team billing, marketplace fees. CRM billing: `lib/stripe/crm-products.ts`, `lib/billing/crm-billing.ts`, `app/api/billing/`. SaaS billing: `ee/stripe/`
-- **Monitoring:** Rollbar (server+client) + Vercel Analytics + Tinybird (server events) + PostHog (client, when key set)
-- **Testing:** Jest 30 + React Testing Library (167 test files, 5,873+ total tests across 167 suites)
+- **Monitoring:** Rollbar (server+client) + Vercel Analytics + PostHog (server events + client analytics, when key set)
+- **Testing:** Jest 30 + React Testing Library (196 test files, 5,800+ total tests across 180+ suites)
 - **CI/CD:** GitHub Actions (4 workflows: test, production, preview, integration)
-- **Deploy:** Vercel — Project `darkroom`, team `bffi`, Node 22.x, auto-deploy from `main`
-  - **Vercel API Access:** `VERCEL_TOKEN` + `VERCEL_ORG_ID` (team: `team_UhYGRc30tmOLJuxfGViNKwhz`) + `VERCEL_PROJECT_ID` (project: `prj_TrkpUM6UHrGWQUY8SPHvASmM8BCA`) — all stored as secrets
-  - **Production Domains:** `app.fundroom.ai`, `app.admin.fundroom.ai`, `app.login.fundroom.ai`, `fundroom.bermudafranchisegroup.com`, `darkroom-sable.vercel.app`
+- **Deploy:** Vercel — Node 22.x, auto-deploy from `main`
+  - **Production Domains:** `app.fundroom.ai`, `app.admin.fundroom.ai`, `app.login.fundroom.ai`
   - **Build:** `prisma generate --schema=./prisma/schema.prisma && node scripts/generate-sw-version.js && next build`
-  - **Vercel Env Vars:** 24 configured (production + preview targets)
-
-## CROSS-REFERENCE: replit.md
-> **IMPORTANT:** Always read `replit.md` alongside this file. It contains condensed build notes, architecture summaries, and critical development rules that complement this document. Keep both files in sync — any metric or build rule change in one must be reflected in the other.
 
 ## BUILD NOTES (Critical — Read Before Any Code Change)
 1. **Middleware:** `proxy.ts` is the ONLY middleware entry point. Do NOT create `middleware.ts` — Next.js 16 will crash with a fatal error: `"Both middleware file and proxy file detected."` See session summary Feb 14 for details.
 2. **Prisma:** Run `npx prisma generate` after any schema changes before TypeScript checking. Stale Prisma clients cause phantom TS errors on fields that exist in schema but not in the generated client.
 3. **TypeScript check:** Always run `npx tsc --noEmit` before pushing to avoid Vercel build failures. Zero TS errors is a hard requirement.
-4. **GitHub sync:** Files pushed via GitHub REST API do NOT auto-sync to Replit workspace. Always verify local files match remote after pushes.
+4. **GitHub sync:** Always verify local files match remote after pushes.
 5. **V1 org-setup:** `app/(saas)/org-setup/` has been DELETED (Feb 19). Server-side redirect in `proxy.ts` handles `/org-setup` → `/admin/setup`. All wizard work goes in the V2 directory (`app/admin/setup/`). V1 API routes (`app/api/org-setup/` and `app/api/org/[orgId]/setup/`) have also been deleted — zero callers.
 
 ## BRAND COLORS
@@ -183,22 +129,23 @@ FundRoom Sign is NATIVE. HTML5 Canvas signature capture + pdf.js rendering. No e
 10. Marketplace schema (empty tables + fields, V2 prep)
 
 ## ENTITY ARCHITECTURE
-Individual / LLC / Trust / 401k-IRA / Other. Each has specific fields. PO Box validation. Auto-fill to documents.
+7 entity types: Individual / Joint / Trust-Estate / LLC-Corporation / Partnership / IRA-Retirement / Charity-Foundation. Each has specific fields, SEC-compliant accreditation criteria, and auto-fill to documents.
 
 ---
 
-## IMPLEMENTATION STATUS (Updated Feb 17, 2026)
+## IMPLEMENTATION STATUS (Updated Feb 22, 2026)
 
 ### ✅ DONE — Foundation & Infrastructure
 
 | Feature | Key Files | Notes |
 |---------|-----------|-------|
-| Prisma Schema (~5,670 lines) | `prisma/schema.prisma` | 137 models (incl. PlatformSettings, Contact, EsigUsageRecord, EsigUsage, Envelope, EnvelopeRecipient, ContactVault, DocumentFiling, VerificationCode): User, Team, Organization, Fund, Investor, Investment, InvestmentTranche, FundClose, LPDocument, Deal, MarketplaceListing, SignatureDocument, etc. 28 migrations, 89 enums (59 base + 8 added Feb 17 + 2 added Feb 19 + 16 added Feb 20 + 6 added Feb 20 e-sign: SigningMode, EnvelopeStatus, EnvelopeRecipientRole, EnvelopeRecipientStatus, DocumentFilingSourceType, DocumentFilingDestType; DocumentStorageType expanded with REPLIT/ENCRYPTED; SignatureFieldType expanded with DROPDOWN/RADIO/NUMERIC/CURRENCY/ATTACHMENT/FORMULA) |
-| Dual-Database Architecture | `lib/prisma/backup-client.ts`, `backup-queue.ts`, `extensions/backup-write.ts` | Supabase primary + Replit Postgres backup, upsert pattern, `BACKUP_DB_ENABLED` kill switch |
+| Prisma Schema (~5,799 lines) | `prisma/schema.prisma` | 140 models, 91 enums, 32 migrations. Key models: User, Team, Organization, Fund, Investor, Investment, InvestmentTranche, FundClose, LPDocument, Deal, MarketplaceListing, SignatureDocument, Envelope, EnvelopeRecipient, Contact, PlatformSettings, FundingRound, DocumentTemplate, AccreditationGateResponse, ContactVault, DocumentFiling |
+| Database Architecture | `lib/prisma.ts`, `lib/prisma/backup-client.ts` | Supabase primary, optional backup via `BACKUP_DB_ENABLED` kill switch |
 | Supabase Primary DB URL | `lib/prisma.ts`, `.env` (gitignored) | `SUPABASE_DATABASE_URL` preferred over `DATABASE_URL`; session pooler port 5432 |
 | NextAuth Authentication | `pages/api/auth/[...nextauth].ts`, `lib/auth/` | Email/password, Google OAuth, magic links, LP portal login |
 | RBAC Middleware | `lib/auth/with-team-auth.ts`, `with-team-auth-pages.ts` | OWNER / SUPER_ADMIN / ADMIN / MANAGER / MEMBER roles, org scoping |
 | Admin Auth Edge Middleware | `lib/middleware/admin-auth.ts`, `proxy.ts` | Edge-compatible JWT session enforcement for `/admin/*` and `/api/admin/*`. Validates session via `getToken()`, blocks LP users (403), redirects unauthenticated (401/307). Defense-in-depth layer before route handlers. User context headers (`x-middleware-user-id/email/role`) passed downstream |
+| Edge Auth (ALL API routes) | `lib/middleware/edge-auth.ts`, `lib/middleware/route-config.ts`, `lib/middleware/cron-auth.ts`, `lib/auth/getMiddlewareUser.ts` | Expanded edge auth from admin-only to ALL API routes. Centralized route classification (PUBLIC/CRON/AUTHENTICATED/TEAM_SCOPED/ADMIN). JWT validation, cron secret verification (timing-safe), user context header injection. `getMiddlewareUser()` helper for downstream handlers. Feb 23 fix: outreach public sub-routes (`/api/outreach/unsubscribe`, `/api/outreach/track/`) moved to PUBLIC_PATHS; `/api/jobs/` moved from CRON_PATHS to PUBLIC_PATHS (uses INTERNAL_API_KEY not CRON_SECRET) |
 | Audit Logging | `lib/audit/audit-logger.ts`, `immutable-audit-log.ts` | 39 event types, SHA-256 hash-chained immutable log for SEC 506(c) |
 | Settings Inheritance | `lib/settings/resolve.ts`, `lib/settings/index.ts` | org_defaults → fund_overrides → object_overrides runtime resolution |
 | Entity Architecture | `lib/entity/types.ts`, `validation.ts`, `autofill.ts` | Individual/LLC/Trust/401k-IRA/Other, PO Box validation, auto-fill mapping |
@@ -223,7 +170,7 @@ Individual / LLC / Trust / 401k-IRA / Other. Each has specific fields. PO Box va
 | Dataroom CRUD | `app/datarooms/`, pages/api dataroom routes |
 | Public Viewer | `app/view/[linkId]/page-client.tsx`, custom domain support |
 | Shareable Links + Policies | `components/links/`, password/expiry/download/print/watermark |
-| Analytics + Engagement Scoring | `components/analytics/`, Tinybird pipes, Hot/Warm/Cool scoring |
+| Analytics + Engagement Scoring | `components/analytics/`, PostHog analytics, Hot/Warm/Cool scoring |
 
 ### ✅ DONE — FundRoom Sign (Native E-Signature)
 
@@ -235,6 +182,7 @@ Individual / LLC / Trust / 401k-IRA / Other. Each has specific fields. PO Box va
 | Completion Certificates | SHA-256 certificate hash generation |
 | Reusable Templates | `SignatureTemplate` model |
 | Consolidated LP Signing UX | `components/esign/FundRoomSign.tsx` — Split-screen signing: PDF viewer (left) + auto-filled fields + signature capture (right) |
+| FundRoomSignFlow Wrapper | `components/esign/FundRoomSignFlow.tsx` — Bridges `/api/lp/signing-documents` + `/api/sign/{token}` → FundRoomSign props. Pre-fetches sign data in parallel. Drop-in replacement for SequentialSigningFlow in LP onboarding |
 | Signature Capture API | `pages/api/signatures/capture.ts` — Store base64 signature for reuse |
 
 ### ✅ DONE — E-Signature Shared Drive & Standalone Envelope System (Feb 20, 2026)
@@ -289,7 +237,7 @@ All signers complete → advanceSigningOrder() detects completion →
 
 | Feature | Key Files |
 |---------|-----------|
-| LP Onboarding (6 steps) | `app/lp/onboard/page-client.tsx` — Account→NDA→Accredited→Entity→Commitment→Funding |
+| LP Onboarding (6 steps) | `app/lp/onboard/page-client.tsx` — Account→NDA→Accredited→Entity→Commitment→Funding. Step 7 (Sign Documents) uses `FundRoomSignFlow` → `FundRoomSign` split-screen UX |
 | Accreditation Wizard | `components/lp/accreditation-wizard.tsx` — SEC 501, auto-approve, KYC hooks |
 | Staged Commitment Wizard | `components/lp/staged-commitment-wizard.tsx` |
 | LP Dashboard | `app/lp/dashboard/page-client.tsx` — status tracker, Upload Doc action |
@@ -399,7 +347,7 @@ LP receives confirmation email
 | Deal CRUD APIs | `app/api/teams/[teamId]/marketplace/deals/` |
 | Deal Documents/Notes | deal documents + notes API routes |
 | Deal Interest/Allocation | `DealInterest`, `DealAllocation` models + APIs |
-| Deal Analytics | `lib/marketplace/analytics.ts` via Tinybird |
+| Deal Analytics | `lib/marketplace/analytics.ts` via PostHog |
 | Marketplace Listings | `MarketplaceListing` model (V2 ready) |
 | Public Browse API | `app/api/marketplace/public/route.ts` | GET: paginated listing browse with search/filter by category/status/minInvestment. No auth required. Returns sanitized public fund data |
 | Waitlist Signup API | `app/api/marketplace/waitlist/route.ts` | POST: email + name + investorType + preferences. Rate limited. Upserts into MarketplaceWaitlist. Zod validated |
@@ -427,7 +375,7 @@ LP receives confirmation email
 |---------|-----------|
 | Rollbar (server+client) | `lib/rollbar.ts`, `lib/error.ts` — 10 critical routes wired. `reportCritical()` for database/wire/auth failures → immediate PagerDuty alert. `reportSecurityIncident()` for auth brute force + unusual access → fingerprinted grouping |
 | Client Failure Tracker | `lib/tracking/failure-tracker.ts` — auto JS errors, API failures |
-| Tinybird Server Events | `lib/tracking/server-events.ts` — 5 funnel events |
+| PostHog Server Events | `lib/tracking/server-events.ts` — 5 funnel events |
 | PostHog | `lib/posthog.ts` — disabled until `NEXT_PUBLIC_POSTHOG_KEY` set |
 | GDPR Cookie Consent | `lib/tracking/cookie-consent.ts`, consent banner |
 | Anomaly Detection | `lib/security/anomaly-detection.ts` |
@@ -514,7 +462,7 @@ Proceed with subscription normally
 |---------|-----------|
 | GitHub Actions | `.github/workflows/` — test, production, preview, integration |
 | Vercel Config | `vercel.json` — function limits, security headers |
-| CSP Headers | `lib/middleware/csp.ts` — Rollbar/PostHog/Tinybird allowed |
+| CSP Headers | `lib/middleware/csp.ts` — Rollbar/PostHog allowed |
 
 ### ✅ DONE — Domain Architecture & Routing (Feb 9)
 
@@ -538,7 +486,7 @@ Proceed with subscription normally
 |---------|-----------|-------|
 | 20-service integration test | `pages/api/admin/test-integrations.ts` | All 20 external services verified and passing |
 | Rollbar migration | `lib/rollbar.ts`, `lib/error.ts` | Migrated to new FundRoom Rollbar account (3 tokens: read, server, client) |
-| Tinybird migration | `lib/tinybird/publish.ts`, `lib/tinybird/pipes.ts` | Connected to new `fundroomia_workspace`, US West 2 |
+| PostHog migration | `lib/tracking/server-events.ts`, `lib/posthog.ts` | Connected to PostHog project, US region |
 | Google OAuth migration | `lib/auth/auth-options.ts` | `FUNDROOM_GOOGLE_CLIENT_*` primary, BFG fallback |
 | Persona KYC setup | `lib/persona.ts`, `lib/providers/kyc/persona-adapter.ts` | API key + webhook secret + template ID (`itmpl_` GovID + Selfie) |
 | Stripe webhook | `pages/api/stripe/webhook.ts` | BFG account temporary, `STRIPE_BFG_WEBHOOK_SECRET` with future FundRoom support |
@@ -705,7 +653,7 @@ Any → CANCELLED (commitment restructured)
 |---------|-----------|-------|
 | Fixed empty NEXTAUTH_URL | Vercel env config | Was empty string → set to `https://app.fundroom.ai` |
 | Fixed empty NEXT_PUBLIC_BASE_URL | Vercel env config | Was empty string → set to `https://app.fundroom.ai` |
-| Added 15+ missing env vars | Vercel env config | Google OAuth, encryption keys, Stripe, Persona, Tinybird, Rollbar, SUPABASE_DATABASE_URL, STORAGE_PROVIDER |
+| Added 15+ missing env vars | Vercel env config | Google OAuth, encryption keys, Stripe, Persona, PostHog, Rollbar, SUPABASE_DATABASE_URL, STORAGE_PROVIDER |
 | Fixed Rollbar token names | Vercel env config | Had wrong names with `DARKROOM` suffix → corrected to `ROLLBAR_SERVER_TOKEN`, `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN`, `ROLLBAR_READ_TOKEN` |
 | STORAGE_PROVIDER=vercel | Vercel env config, `pages/api/health.ts` | Health endpoint requires this — was missing, causing "degraded" status |
 | SUPABASE_DATABASE_URL added | Vercel env config, `lib/prisma.ts` | Code prefers this over `DATABASE_URL` — was missing on Vercel |
@@ -714,7 +662,7 @@ Any → CANCELLED (commitment restructured)
 | Google OAuth restored | `lib/auth/auth-options.ts` | Now shows in auth providers (was missing before credentials were added) |
 | All domains verified | Vercel dashboard | `app.fundroom.ai`, `app.login.fundroom.ai`, `app.admin.fundroom.ai` all HTTP 200 |
 
-**Vercel deployment note:** `STORAGE_PROVIDER` must be `vercel` on Vercel (Vercel Blob Storage). For self-hosted/local, use `s3`, `r2`, or `local`.
+**Vercel deployment note:** `STORAGE_PROVIDER` must be `vercel` on Vercel (Vercel Blob Storage). For local development, use `s3`, `r2`, or `local`.
 
 **Vercel API behavior:** All secrets created via REST API are stored as `"sensitive"` type. Values appear empty in GET responses (encrypted). Must redeploy after env var changes.
 
@@ -1108,18 +1056,16 @@ Wizard renders with fund context
 **Database Architecture (verified):**
 ```
 Primary: SUPABASE_DATABASE_URL → Supabase Postgres (production)
-Backup:  REPLIT_DATABASE_URL → Replit Postgres (dev/backup, BACKUP_DB_ENABLED=false)
-Routing:  lib/prisma.ts prefers SUPABASE_DATABASE_URL, falls back to DATABASE_URL
-333 of 403 API routes import prisma → Supabase in production (70 non-DB routes: webhooks, health, static)
+Routing: lib/prisma.ts prefers SUPABASE_DATABASE_URL, falls back to DATABASE_URL
 ```
 
-**Schema Metrics (after sync):**
-| Metric | Supabase (Production) | Replit (Development) |
-|--------|----------------------|---------------------|
-| Tables | 117 | 117 |
-| Columns | 1,683 | 1,683 |
-| Indexes | 524 | 524 |
-| Enums | 40 | 40 |
+**Schema Metrics (current — Feb 22, 2026):**
+| Metric | Value |
+|--------|-------|
+| Models | 140 |
+| Lines | 5,799 |
+| Enums | 91 |
+| Migrations | 32 |
 
 ### ✅ DONE — P0-5: signedFileUrl Column on SignatureDocument (Feb 13, 2026)
 
@@ -1940,7 +1886,7 @@ DEACTIVATED → ACTIVE (reactivate)
 | Bermuda seed: Organization fields | `prisma/seed-bermuda.ts` | Added `entityType`, `productMode`, `sector`, `geography`, `website`, `foundedYear`, `relatedPersons` (Form D Section 3), `previousNames`, `regulationDExemption` |
 | Bermuda seed: Fund fields | `prisma/seed-bermuda.ts` | Added `regulationDExemption: "506C"`, `investmentCompanyExemption: "3C1"`, `useOfProceeds` |
 | Bermuda seed: Sample LP enhanced | `prisma/seed-bermuda.ts` | Added `accreditationCategory: "INCOME_200K"`, `accreditationMethod: "SELF_ACK"`, `sourceOfFunds: "SALARY"`, `occupation`, `entityData` (PEP status, citizenship), `fundData.representations` (all 12 SEC reps), password hash |
-| Bermuda seed: Demo LP (LLC entity) | `prisma/seed-bermuda.ts` | New user `demo-investor@example.com / Investor2026!`. LLC entity with 2 beneficial owners (60/40 split), `ENTITY_ASSETS_5M` accreditation, committed investment ($90K), full 12 SEC representations |
+| Bermuda seed: Demo LP (LLC entity) | `prisma/seed-bermuda.ts` | New user `demo-investor@example.com` (password via `LP_SEED_PASSWORD` env var). LLC entity with 2 beneficial owners (60/40 split), `ENTITY_ASSETS_5M` accreditation, committed investment ($90K), full 12 SEC representations |
 | Bermuda seed: FundroomActivation | `prisma/seed-bermuda.ts` | ACTIVE activation for Bermuda team with full `setupProgress` (wire, docs, branding, fund, economics, raiseType, lpOnboarding, notifications) |
 | Bermuda seed: PlatformSettings | `prisma/seed-bermuda.ts` | Singleton with `paywallEnforced: false`, 90-day bypass, `registrationOpen: true` for MVP launch |
 | Bermuda seed: OrganizationDefaults | `prisma/seed-bermuda.ts` | Added `allowExternalDocUpload`, `allowGpDocUploadForLp`, `accreditationMethod`, 6 notification toggles (all true) |
@@ -1949,7 +1895,7 @@ DEACTIVATED → ACTIVE (reactivate)
 
 **Seed Data Summary:**
 - 2 LP users seeded: `investor@fundroom.ai` (Individual, APPLIED) + `demo-investor@example.com` (LLC, COMMITTED)
-- GP login: `joe@bermudafranchisegroup.com / FundRoom2026!` | LP login: `demo-investor@example.com / Investor2026!`
+- GP login: `joe@bermudafranchisegroup.com` (see `GP_SEED_PASSWORD` env var) | LP login: `demo-investor@example.com` (see `LP_SEED_PASSWORD` env var)
 - FundroomActivation ACTIVE, PlatformSettings paywall bypassed
 - Clean function updated to handle `fundroomActivation.deleteMany`
 
@@ -2462,7 +2408,7 @@ Request → proxy.ts → /api/ route?
 | P0-C | Investor Review split (999→470 lines, 53% reduction) | `app/admin/investors/[investorId]/review/page-client.tsx`, `components/admin/investor-review/` (5 new files) | Extracted 4 sub-components: InvestorSummaryCards, DocumentReviewPanel, WireConfirmationPanel, ReviewActionModals. Barrel export via index.ts |
 | P0-D | Mobile LP Polish | `components/lp/bottom-tab-bar.tsx`, `components/lp/lp-header.tsx`, `app/lp/docs/page-client.tsx`, `app/lp/transactions/page-client.tsx` | Touch targets ≥44px, bottom tab bar polish, responsive fixes, clean layout hierarchy |
 | P0-E | WCAG AA Accessibility Audit (18 issues, all fixed) | 7 files across LP dashboard, wire, docs, FundRoomSign, dashboard-summary, fund-card | `role="alert"` on error states, `aria-hidden="true"` on 16+ decorative icons, `aria-label` on icon-only buttons and external links, `aria-current` on font selector, `aria-label` on filter selects. MetricTooltip already accessible. `prefers-reduced-motion` already handled in globals.css |
-| P0-F | PostHog/Tinybird Analytics (8 critical flows) | 8 API route files | `publishServerEvent()` fire-and-forget instrumentation: `funnel_org_setup_completed`, `funnel_lp_commitment_made`, `funnel_wire_proof_uploaded`, `funnel_gp_wire_confirmed`, `funnel_document_signed`, `funnel_lp_nda_signed`, `funnel_lp_onboarding_started`, `funnel_investor_approved` |
+| P0-F | PostHog Analytics (8 critical flows) | 8 API route files | `publishServerEvent()` fire-and-forget instrumentation: `funnel_org_setup_completed`, `funnel_lp_commitment_made`, `funnel_wire_proof_uploaded`, `funnel_gp_wire_confirmed`, `funnel_document_signed`, `funnel_lp_nda_signed`, `funnel_lp_onboarding_started`, `funnel_investor_approved` |
 
 **P0-E Accessibility Fixes Detail:**
 | # | Severity | Fix | File |
@@ -3052,13 +2998,87 @@ Layer 4: Route handlers → team-specific RBAC with Prisma (enforceRBAC, withTea
 **New files:** 2 (`lib/middleware/admin-auth.ts`, `__tests__/middleware/admin-auth.test.ts`)
 **Modified files:** 1 (`proxy.ts`)
 
+### ✅ DONE — Edge Auth Expansion + Security Hardening Sprint (Feb 22, 2026)
+
+Two-sprint build expanding edge-level authentication from admin-only to ALL API routes in proxy.ts, plus security hardening from external review (credential cleanup, secrets audit, encryption audit, licensing).
+
+**Sprint 2: Edge Auth Expansion (Tasks 10-14)**
+
+| Feature | Key Files | Notes |
+|---------|-----------|-------|
+| Route Classification | `lib/middleware/route-config.ts` | Centralized route categorization: PUBLIC (health, webhooks, branding, tracking, outreach unsubscribe/track, jobs, internal), CRON (scheduled jobs via CRON_SECRET), AUTHENTICATED (LP, auth endpoints), TEAM_SCOPED (teams, funds, datarooms, outreach), ADMIN (admin API + pages). `classifyRoute()` export. Feb 23 fix: outreach public sub-routes added to PUBLIC_PATHS; `/api/jobs/` moved from CRON_PATHS to PUBLIC_PATHS (uses INTERNAL_API_KEY not CRON_SECRET) |
+| Edge Auth Module | `lib/middleware/edge-auth.ts` | `enforceEdgeAuth()` — edge-compatible JWT validation for all non-public API routes. Uses `getToken()` from next-auth/jwt. Returns `NextResponse` (401/403) or null (allow). Injects user context headers (`x-middleware-user-id`, `x-middleware-user-email`, `x-middleware-user-role`). Delegates to admin-auth for `/admin/*` routes. Delegates to cron-auth for cron routes |
+| Cron Auth Module | `lib/middleware/cron-auth.ts` | `verifyCronAuth()` — validates `Authorization: Bearer {CRON_SECRET}` header for scheduled job routes. Timing-safe comparison via `crypto.timingSafeEqual()`. Returns 401 on missing/invalid token |
+| Proxy.ts Refactor | `proxy.ts` | API section now uses `enforceEdgeAuth()` instead of inline admin-only checks. Route classification delegated to `classifyRoute()`. All authenticated routes receive user context headers. Cron routes verified. Public routes explicitly allowlisted |
+| Middleware User Helper | `lib/auth/getMiddlewareUser.ts` | `getMiddlewareUser(req)` — extracts user context from `x-middleware-user-*` headers injected by edge auth. Returns `{ userId, email, role }` or null. Used by downstream route handlers as trusted user identity (headers set by middleware, not client) |
+
+**Sprint 3: Security Hardening (Tasks 15-19)**
+
+| Feature | Key Files | Notes |
+|---------|-----------|-------|
+| Demo Credential Cleanup | `CLAUDE.md` | Removed hardcoded passwords from DEMO CREDENTIALS section. Now references env vars only: `GP_SEED_PASSWORD`, `LP_SEED_PASSWORD`, `ADMIN_TEMP_PASSWORD`. E2E fixtures (`e2e/fixtures/auth.ts`) already used env vars with fallback defaults |
+| .env.example Update | `.env.example` | Added ~20 missing env vars across 10+ categories: `CRON_SECRET`, `GP_SEED_PASSWORD`, `LP_SEED_PASSWORD`, `ADMIN_SEED_PASSWORD`, `SVIX_SECRET`, `MFA_ENCRYPTION_KEY`, `RESEND_WEBHOOK_SECRET`, plus documentation for all existing vars |
+| Secrets Audit | `docs/SECRETS_AUDIT.md` | 10-pattern scan across all `.ts/.tsx/.js/.mjs` files. Result: PASS — no exposed secrets. Patterns checked: Stripe keys, Resend keys, webhook secrets, bearer tokens, hardcoded passwords, private keys, JWTs, API keys, committed .env files, encryption keys. Recommendations: enable GitHub Secret Scanning + Push Protection |
+| Wire Instruction Encryption Fix | `lib/wire-transfer/instructions.ts` | **P0 security fix:** `setWireInstructions()` now encrypts `accountNumber` and `routingNumber` via `encryptTaxId()` (AES-256-GCM). `getWireInstructions()` decrypts on read. `getWireInstructionsPublic()` decrypts then masks to last 4 digits. Previously stored as plaintext while setup wizard encrypted — inconsistency fixed |
+| Encryption Audit | `docs/ENCRYPTION_AUDIT.md` | Full audit of all 9 encryption implementations. 14 data types verified encrypted: SSN, EIN, wire account/routing numbers, Plaid tokens, MFA TOTP secrets, signature images, document passwords, auth tokens, API keys, webhook secrets. Required production env vars documented |
+| LICENSE File | `LICENSE` | Proprietary software license for FundRoom AI, Inc. Copyright 2024-2026, all rights reserved. `package.json` updated with `"license": "PROPRIETARY"` |
+| README.md Security Section | `README.md` | Added GitHub secret scanning recommendation, encryption audit link, demo credentials note referencing env vars |
+| DATABASE_SETUP.md Credential Fix | `docs/DATABASE_SETUP.md` | Replaced hardcoded `YourPassword123` placeholder with `[your-secure-password-here]` |
+| Prisma Schema Encrypted Fields Docs | `prisma/schema.prisma` | Added 22-line encrypted fields documentation block listing all AES-256-GCM encrypted data types with key sources |
+| TypeScript Fix | `app/api/admin/investors/bulk-import/route.ts` | Removed invalid `investorCount` field from FundAggregate upsert (pre-existing TS error discovered during `tsc --noEmit` verification) |
+
+**Edge Auth Architecture (after Sprint 2):**
+```
+Request → proxy.ts → /api/ route?
+  → classifyRoute(pathname) →
+    PUBLIC → Pass through (no auth)
+    CRON → verifyCronAuth() → verify CRON_SECRET Bearer token
+    ADMIN → enforceAdminAuth() → JWT + LP blocking + user headers
+    AUTHENTICATED/TEAM_SCOPED → enforceEdgeAuth() → JWT + user headers
+  → Route handler → getMiddlewareUser(req) for trusted user identity
+```
+
+**Defense-in-Depth Architecture (5 layers):**
+```
+Layer 1: proxy.ts edge middleware → JWT validation for ALL routes (NEW — expanded from admin-only)
+Layer 2: proxy.ts admin auth → LP blocking + admin-specific checks
+Layer 3: AppMiddleware → role-specific routing + session re-validation
+Layer 4: DomainMiddleware → domain-level gating for app.admin.fundroom.ai
+Layer 5: Route handlers → team-specific RBAC with Prisma (enforceRBAC, withTeamAuth)
+```
+
+**New files:** 5 (`lib/middleware/route-config.ts`, `lib/middleware/edge-auth.ts`, `lib/middleware/cron-auth.ts`, `lib/auth/getMiddlewareUser.ts`, `LICENSE`)
+**New docs:** 2 (`docs/SECRETS_AUDIT.md`, `docs/ENCRYPTION_AUDIT.md`)
+**Modified files:** 9 (`proxy.ts`, `CLAUDE.md`, `.env.example`, `lib/wire-transfer/instructions.ts`, `package.json`, `README.md`, `docs/DATABASE_SETUP.md`, `prisma/schema.prisma` (encrypted fields documentation), `CHANGELOG.md`)
+
+### ✅ DONE — LP Signing Consolidation: FundRoomSignFlow Wrapper (Feb 23, 2026)
+
+Replaced SequentialSigningFlow with FundRoomSignFlow in LP onboarding. FundRoomSignFlow bridges the signing-documents API with FundRoomSign's split-screen UX. Public signing page (`app/view/sign/[token]`) intentionally kept separate — different UX requirements (single-doc, external signer, decline support, branding wrapper).
+
+| Feature | Key Files | Notes |
+|---------|-----------|-------|
+| FundRoomSignFlow Wrapper | `components/esign/FundRoomSignFlow.tsx` (NEW, ~396 lines) | Fetches doc list from `/api/lp/signing-documents`, pre-fetches sign data via `GET /api/sign/{token}` in parallel using `Promise.allSettled`, transforms responses into `SigningDocument[]` for FundRoomSign. Handles 5 states: loading, error, no-documents, complete, ready. Extracts `InvestorAutoFillData` from first successful recipient response. Same props interface as SequentialSigningFlow for drop-in replacement |
+| LP Onboarding Wiring | `app/lp/onboard/page-client.tsx` | Replaced `SequentialSigningFlow` lazy import with `FundRoomSignFlow`. Step 7 (Sign Documents) now renders FundRoomSign split-screen UX |
+| Public Signing Page | `app/view/sign/[token]/page-client.tsx` | Kept as-is — purpose-built for external single-document signing with decline dialog, token-based auth, custom branding header/footer. Converting to FundRoomSign would degrade UX (unnecessary queue step, no decline support) |
+
+**Signing Architecture (after consolidation):**
+```
+LP Onboarding (multi-doc, authenticated):
+  FundRoomSignFlow → fetches signing-documents + sign data → FundRoomSign (split-screen)
+
+Public Signing (single-doc, token-based):
+  app/view/sign/[token] → fetches sign data → custom single-doc signing UI with decline
+
+Both use: POST /api/sign/{token} for submission
+```
+
 ### ⚠️ KNOWN — Follow-Up Items
 
 | Issue | Severity | Details |
 |-------|----------|---------|
 | Apply RBAC middleware to remaining routes | Low | 9 critical admin routes migrated to `enforceRBAC()`. Remaining ~330 Pages Router routes use functionally equivalent inline auth — migration is a DRY improvement, not a security gap |
 | Set up LinkedIn OAuth | Medium | Create LinkedIn developer app, register under fundroom.ai, add credentials. OAuth provider registration is already conditional — buttons will appear once credentials are set |
-| Verify integrations end-to-end | Medium | Resend, Stripe, Persona, Tinybird all have tokens set but need live API call verification |
+| Verify integrations end-to-end | Medium | Resend, Stripe, Persona, PostHog all have tokens set but need live API call verification |
 | LP Dashboard e2e testing | Medium | All components exist but need end-to-end flow verification |
 | Mobile on-device testing | Low | Code-level mobile fixes applied — needs on-device testing with iPhone Safari and Android Chrome |
 | Stripe ACH Direct Debit | Low | Phase 2 feature — manual wire is MVP |
@@ -3113,8 +3133,8 @@ After every feature, bug fix, refactor, or infrastructure change, update ALL of 
 2. **`CLAUDE.md` — REFERENCE DOCUMENTS list**
    - If a new doc was created in `/docs/`, add it to the reference list
 
-3. **`docs/FundRoom_Claude_Code_Handoff.md` — Implementation Changelog**
-   - Add a dated changelog entry at the top of the changelog section
+3. **`CHANGELOG.md` — Version History**
+   - Add a dated changelog entry for new releases
    - Include: what shipped, key files changed, status
 
 4. **`README.md` — Architecture tree + metrics**
@@ -3123,12 +3143,10 @@ After every feature, bug fix, refactor, or infrastructure change, update ALL of 
    - Update feature descriptions if new capabilities were added
 
 5. **Relevant `/docs/*.md` files**
-   - If a change touches monitoring → update `TRACKING_AND_MONITORING.md` or `BUG_MONITORING_TOOLS_REPORT.md`
+   - If a change touches monitoring → update `TRACKING_AND_MONITORING.md`
    - If a change touches CI/CD → update `GITHUB_ACTIONS_GUIDE.md`
-   - If a change touches database → update `DUAL_DATABASE_SPEC.md`
-   - If a change touches naming/branding → update `NAMING_MIGRATION.md` and `FundRoom_Brand_Guidelines.md`
-
-6. **`replit.md`** — Update if development environment or project structure changed
+   - If a change touches database → update `DUAL_DATABASE_SPEC.md` or `DATABASE_SETUP.md`
+   - If a change touches branding → update `FundRoom_Brand_Guidelines.md`
 
 ### When to Update
 

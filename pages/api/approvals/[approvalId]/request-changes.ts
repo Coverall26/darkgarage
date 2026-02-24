@@ -1,11 +1,57 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
+import { z } from "zod";
 
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { ChangeRequestType } from "@prisma/client";
+
+const ALLOWED_FIELD_NAMES = [
+  "entityName",
+  "firstName",
+  "lastName",
+  "email",
+  "entityType",
+  "accreditationStatus",
+  "accreditationCategory",
+  "addressLine1",
+  "addressLine2",
+  "addressCity",
+  "addressState",
+  "addressPostalCode",
+  "addressCountry",
+  "phone",
+  "taxIdEncrypted",
+  "sourceOfFunds",
+  "occupation",
+] as const;
+
+const RequestChangesSchema = z.object({
+  fundId: z.string().min(1, "fundId is required"),
+  teamId: z.string().min(1, "teamId is required"),
+  requestedChanges: z
+    .array(
+      z.object({
+        changeType: z.enum(
+          ["ENTITY_INFO", "ACCREDITATION", "DOCUMENT", "ADDRESS", "TAX_ID", "BANK_INFO"],
+          { errorMap: () => ({ message: "Invalid changeType" }) },
+        ),
+        fieldName: z.enum(ALLOWED_FIELD_NAMES, {
+          errorMap: () => ({
+            message: `fieldName must be one of: ${ALLOWED_FIELD_NAMES.join(", ")}`,
+          }),
+        }),
+        reason: z.string().min(1, "reason is required").max(2000),
+        currentValue: z.string().max(1000).optional(),
+        requestedValue: z.string().max(1000).optional(),
+      }),
+    )
+    .min(1, "At least one change request is required")
+    .max(20, "Maximum 20 change requests allowed"),
+  notes: z.string().max(2000).optional(),
+});
 
 /**
  * POST /api/approvals/[approvalId]/request-changes
@@ -27,26 +73,15 @@ export default async function handler(
   }
 
   const { approvalId } = req.query as { approvalId: string };
-  const { fundId, teamId, requestedChanges, notes } = req.body as {
-    fundId: string;
-    teamId: string;
-    requestedChanges: Array<{
-      changeType: string;
-      fieldName: string;
-      reason: string;
-      currentValue?: string;
-      requestedValue?: string;
-    }>;
-    notes?: string;
-  };
 
-  if (!fundId || !teamId) {
-    return res.status(400).json({ error: "fundId and teamId are required" });
+  const parsed = RequestChangesSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message || "Invalid request body",
+    });
   }
 
-  if (!requestedChanges || requestedChanges.length === 0) {
-    return res.status(400).json({ error: "No change requests provided" });
-  }
+  const { fundId, teamId, requestedChanges, notes } = parsed.data;
 
   try {
     // Verify GP admin access
@@ -84,7 +119,7 @@ export default async function handler(
             fundId,
             requestedBy: session.user.id,
             status: "PENDING",
-            changeType: change.changeType as ChangeRequestType,
+            changeType: change.changeType,
             fieldName: change.fieldName,
             reason: change.reason,
             currentValue: change.currentValue,

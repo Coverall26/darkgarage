@@ -6,8 +6,10 @@ import { getServerSession } from "next-auth";
 import { hashToken } from "@/lib/api/auth/token";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { newId } from "@/lib/id-helper";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
+import { TokenCreateSchema } from "@/lib/validations/teams";
 import { reportError } from "@/lib/error";
 
 export default async function handle(
@@ -84,7 +86,12 @@ export default async function handle(
 
     const { teamId } = req.query as { teamId: string };
     const userId = (session.user as CustomUser).id;
-    const { name } = req.body;
+
+    const parsed = validateBodyPagesRouter(req.body, TokenCreateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { name } = parsed.data;
 
     try {
       // Check if user is in team

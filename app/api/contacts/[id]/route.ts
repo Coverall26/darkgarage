@@ -12,6 +12,8 @@ import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { resolveCrmRole, hasCrmPermission, type CrmRoleLevel } from "@/lib/auth/crm-roles";
+import { validateBody } from "@/lib/middleware/validate";
+import { ContactUpdateSchema } from "@/lib/validations/teams";
 
 export const dynamic = "force-dynamic";
 
@@ -138,7 +140,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Contact not found" }, { status: 404 });
     }
 
-    const body = await req.json();
+    const parsed = await validateBody(req, ContactUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     // Allowed fields for update
     const updatable: Record<string, unknown> = {};
@@ -148,9 +152,7 @@ export async function PATCH(
     if (body.company !== undefined) updatable.company = body.company?.trim() || null;
     if (body.title !== undefined) updatable.title = body.title?.trim() || null;
     if (body.tags !== undefined) updatable.tags = body.tags;
-    if (body.customFields !== undefined) updatable.customFields = body.customFields;
     if (body.notes !== undefined) updatable.notes = body.notes?.trim() || null;
-    if (body.assignedToId !== undefined) updatable.assignedToId = body.assignedToId || null;
 
     if (Object.keys(updatable).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });

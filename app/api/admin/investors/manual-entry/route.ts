@@ -8,6 +8,7 @@ import { encryptTaxId } from "@/lib/crypto/secure-storage";
 import { requireAdminAppRouter } from "@/lib/auth/rbac";
 import { uploadInvestorDocument } from "@/lib/storage/investor-storage";
 import { sendInvestorWelcomeEmailWithFund } from "@/lib/emails/send-investor-welcome";
+import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import type { AccreditationStatus, InvestmentStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +95,9 @@ function mapDocType(
 }
 
 export async function POST(req: NextRequest) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   let body: unknown;
   try {
     body = await req.json();

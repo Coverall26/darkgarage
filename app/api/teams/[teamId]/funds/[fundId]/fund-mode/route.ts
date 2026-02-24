@@ -15,6 +15,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundModeSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -61,15 +63,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Fund not found" }, { status: 404 });
     }
 
-    const body = await req.json();
-    const { mode } = body;
-
-    if (!mode || !VALID_MODES.includes(mode)) {
-      return NextResponse.json(
-        { error: `Invalid mode. Must be one of: ${VALID_MODES.join(", ")}` },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, FundModeSchema);
+    if (parsed.error) return parsed.error;
+    const { mode } = parsed.data;
 
     // If same mode, no-op
     if (fund.entityMode === mode) {

@@ -4,9 +4,11 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
+import { DataroomGroupUpdateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -96,11 +98,13 @@ export default async function handle(
       groupId: string;
     };
 
-    const { name, allowAll, domains } = req.body as {
-      name?: string;
-      allowAll?: boolean;
-      domains?: string[];
-    };
+    const parsed = validateBodyPagesRouter(req.body, DataroomGroupUpdateSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { name, allowAll, domains } = parsed.data;
     const userId = (session.user as CustomUser).id;
 
     try {

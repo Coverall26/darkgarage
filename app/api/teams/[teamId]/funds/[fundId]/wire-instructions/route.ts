@@ -6,6 +6,7 @@ import {
   deleteWireInstructions,
 } from "@/lib/wire-transfer";
 import { reportError } from "@/lib/error";
+import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ type Params = {
  * Get wire instructions for a fund (GP view — full details).
  */
 export async function GET(req: NextRequest, { params }: Params) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   try {
     const { teamId, fundId } = await params;
     const auth = await authenticateGP(teamId);
@@ -44,6 +48,9 @@ export async function GET(req: NextRequest, { params }: Params) {
  * Set or update wire instructions for a fund.
  */
 export async function POST(req: NextRequest, { params }: Params) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   try {
     const { teamId, fundId } = await params;
     const auth = await authenticateGP(teamId);
@@ -88,6 +95,9 @@ export async function POST(req: NextRequest, { params }: Params) {
  * Remove wire instructions from a fund.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   try {
     const { teamId, fundId } = await params;
     const auth = await authenticateGP(teamId);

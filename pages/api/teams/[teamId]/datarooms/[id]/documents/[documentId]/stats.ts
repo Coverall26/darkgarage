@@ -6,10 +6,6 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import {
-  getTotalAvgPageDuration,
-  getTotalDocumentDuration,
-} from "@/lib/tinybird";
 import { getTotalAvgPageDurationPg } from "@/lib/tracking/postgres-stats";
 import { CustomUser } from "@/lib/types";
 
@@ -137,21 +133,10 @@ export default async function handle(
 
       const excludedViewIdsList = allExcludedViews.map((view) => view.id);
       
-      let duration: { data: { pageNumber: string; versionNumber: number; avg_duration: number }[] };
-      
-      if (process.env.TINYBIRD_TOKEN) {
-        duration = await getTotalAvgPageDuration({
-          documentId: documentId,
-          excludedLinkIds: "",
-          excludedViewIds: excludedViewIdsList.join(","),
-          since: 0,
-        });
-      } else {
-        duration = await getTotalAvgPageDurationPg({
-          documentId: documentId,
-          excludedViewIds: excludedViewIdsList,
-        });
-      }
+      const duration = await getTotalAvgPageDurationPg({
+        documentId: documentId,
+        excludedViewIds: excludedViewIdsList,
+      });
 
       const stats = {
         views: filteredViews,

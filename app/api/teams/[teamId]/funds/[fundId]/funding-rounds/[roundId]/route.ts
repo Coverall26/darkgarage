@@ -17,6 +17,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundingRoundUpdateSchema } from "@/lib/validations/fund";
 
 export const dynamic = "force-dynamic";
 
@@ -134,17 +136,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Funding round not found" }, { status: 404 });
     }
 
-    const body = await req.json();
+    const parsed = await validateBody(req, FundingRoundUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
-    // Validate round name if changed
+    // Check uniqueness of round name within fund (excluding this round)
     if (body.roundName !== undefined) {
-      if (typeof body.roundName !== "string" || body.roundName.trim().length === 0) {
-        return NextResponse.json({ error: "Round name is required" }, { status: 400 });
-      }
-      if (body.roundName.trim().length > 100) {
-        return NextResponse.json({ error: "Round name must be under 100 characters" }, { status: 400 });
-      }
-      // Check uniqueness within fund (excluding this round)
       const duplicate = await prisma.fundingRound.findFirst({
         where: {
           fundId,
@@ -158,14 +155,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
           { status: 409 },
         );
       }
-    }
-
-    // Validate status
-    if (body.status !== undefined && !VALID_ROUND_STATUSES.includes(body.status)) {
-      return NextResponse.json(
-        { error: `Invalid status. Must be one of: ${VALID_ROUND_STATUSES.join(", ")}` },
-        { status: 400 },
-      );
     }
 
     // If setting to ACTIVE, ensure no other active round
@@ -192,7 +181,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const updateData: Record<string, unknown> = {};
 
     if (body.roundName !== undefined) updateData.roundName = body.roundName.trim();
-    if (body.roundOrder !== undefined) updateData.roundOrder = parseInt(body.roundOrder);
+    if (body.roundOrder !== undefined) updateData.roundOrder = body.roundOrder;
     if (body.status !== undefined) updateData.status = body.status;
     if (body.isExternal !== undefined) updateData.isExternal = body.isExternal === true;
     if (body.externalNotes !== undefined) updateData.externalNotes = body.externalNotes?.trim() || null;
@@ -211,7 +200,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const postMoneyVal = parseDecimal(body.postMoneyVal);
     if (postMoneyVal !== undefined) updateData.postMoneyVal = postMoneyVal || null;
 
-    if (body.investorCount !== undefined) updateData.investorCount = parseInt(body.investorCount) || 0;
+    if (body.investorCount !== undefined) updateData.investorCount = body.investorCount ?? 0;
 
     const valuationCap = parseDecimal(body.valuationCap);
     if (valuationCap !== undefined) updateData.valuationCap = valuationCap || null;

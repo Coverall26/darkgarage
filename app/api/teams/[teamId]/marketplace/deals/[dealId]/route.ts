@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateGP } from "@/lib/marketplace/auth";
 import { getDeal, updateDeal, deleteDeal } from "@/lib/marketplace";
+import type { UpdateDealInput } from "@/lib/marketplace/types";
 import { verifyNotBot } from "@/lib/security/bot-protection";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { DealUpdateSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +47,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
-    const deal = await updateDeal(dealId, body, auth.userId);
+    const parsed = await validateBody(req, DealUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
+    const deal = await updateDeal(dealId, body as UpdateDealInput, auth.userId);
     return NextResponse.json({ success: true, deal });
   } catch (error: unknown) {
     console.error("Update deal error:", error);

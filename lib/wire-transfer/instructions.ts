@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 
 import prisma from "@/lib/prisma";
+import {
+  encryptTaxId,
+  decryptTaxId,
+} from "@/lib/crypto/secure-storage";
 import type {
   SetWireInstructionsInput,
   WireInstructions,
@@ -29,10 +33,11 @@ export async function setWireInstructions(
     throw new Error(`Fund not found: ${fundId}`);
   }
 
+  // Encrypt sensitive financial fields (account/routing numbers) with AES-256-GCM
   const wireInstructions: WireInstructions = {
     bankName: input.bankName,
-    accountNumber: input.accountNumber,
-    routingNumber: input.routingNumber,
+    accountNumber: input.accountNumber ? encryptTaxId(input.accountNumber) : input.accountNumber,
+    routingNumber: input.routingNumber ? encryptTaxId(input.routingNumber) : input.routingNumber,
     swiftCode: input.swiftCode,
     beneficiaryName: input.beneficiaryName,
     beneficiaryAddress: input.beneficiaryAddress,
@@ -61,6 +66,7 @@ export async function setWireInstructions(
 
 /**
  * Get wire instructions for a fund (GP view — full details).
+ * Decrypts account/routing numbers from AES-256-GCM encrypted storage.
  */
 export async function getWireInstructions(
   fundId: string,
@@ -72,11 +78,24 @@ export async function getWireInstructions(
 
   if (!fund?.wireInstructions) return null;
 
-  return fund.wireInstructions as unknown as WireInstructions;
+  const instructions = fund.wireInstructions as unknown as WireInstructions;
+
+  // Decrypt sensitive fields for GP view
+  return {
+    ...instructions,
+    accountNumber: instructions.accountNumber
+      ? decryptTaxId(instructions.accountNumber)
+      : instructions.accountNumber,
+    routingNumber: instructions.routingNumber
+      ? decryptTaxId(instructions.routingNumber)
+      : instructions.routingNumber,
+  };
 }
 
 /**
  * Get wire instructions for a fund (LP view — masked account number).
+ * Account number is decrypted then masked to last 4 digits.
+ * Routing number is NOT exposed to LP view for security.
  */
 export async function getWireInstructionsPublic(
   fundId: string,
@@ -84,9 +103,11 @@ export async function getWireInstructionsPublic(
   const instructions = await getWireInstructions(fundId);
   if (!instructions) return null;
 
+  const accountNum = instructions.accountNumber || "";
+
   return {
     bankName: instructions.bankName,
-    accountNumberLast4: instructions.accountNumber.slice(-4),
+    accountNumberLast4: accountNum.length >= 4 ? accountNum.slice(-4) : "****",
     routingNumber: instructions.routingNumber,
     swiftCode: instructions.swiftCode,
     beneficiaryName: instructions.beneficiaryName,

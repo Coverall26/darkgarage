@@ -8,8 +8,6 @@ import { getServerSession } from "next-auth/next";
 import { LIMITS } from "@/lib/constants";
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { getViewPageDuration } from "@/lib/tinybird";
-import { getVideoEventsByDocument } from "@/lib/tinybird/pipes";
 import { getViewDurationStatsPg } from "@/lib/tracking/postgres-stats";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
@@ -137,18 +135,10 @@ async function getVideoViews(
 
 async function getDocumentViews(views: ViewWithExtras[], document: Document) {
   const durationsPromises = views.map((view) => {
-    if (process.env.TINYBIRD_TOKEN) {
-      return getViewPageDuration({
-        documentId: document.id,
-        viewId: view.id,
-        since: 0,
-      });
-    } else {
-      return getViewDurationStatsPg({
-        documentId: document.id,
-        viewId: view.id,
-      });
-    }
+    return getViewDurationStatsPg({
+      documentId: document.id,
+      viewId: view.id,
+    });
   });
 
   const durations = await Promise.all(durationsPromises);
@@ -330,13 +320,11 @@ export default async function handle(
 
       let viewsWithDuration;
       if (document.type === "video") {
-        const videoEvents = await getVideoEventsByDocument({
-          document_id: docId,
-        });
+        // Video events have no Prisma model - pass empty data
         viewsWithDuration = await getVideoViews(
           limitedViews,
           document,
-          videoEvents,
+          { data: [] },
         );
       } else {
         viewsWithDuration = await getDocumentViews(limitedViews, document);

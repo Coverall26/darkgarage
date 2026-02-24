@@ -10,25 +10,19 @@ FundRoom.ai is a multi-tenant SaaS platform designed for General Partners (GPs) 
 - Communication: Simple, everyday language
 - Technical level: Non-technical explanations preferred
 - Focus: Security and ease of use for investors
-- Git remote: `Darkroom4/darkroom` (NOT BermudaClub/darkroom)
+- Git remote: `Darkroom4/darkroom` (repo codename; product name is FundRoom.ai)
 - Push method: GitHub API with GITHUB_PAT secret (git push blocked by large file in history)
 - Always run `npx tsc --noEmit` before pushing to avoid Vercel build failures
 
 ## Demo Credentials (Development/Staging)
-- **GP Login:** joe@bermudafranchisegroup.com / FundRoom2026!
-- **LP Login:** demo-investor@example.com / Investor2026!
-- **Admin Login:** rciesco@fundroom.ai / (see ADMIN_TEMP_PASSWORD secret)
+- **GP Login:** joe@bermudafranchisegroup.com / (see `GP_SEED_PASSWORD` env var)
+- **LP Login:** demo-investor@example.com / (see `LP_SEED_PASSWORD` env var)
+- **Admin Login:** rciesco@fundroom.ai / (see `ADMIN_TEMP_PASSWORD` env var)
 - **Dataroom URL:** /d/bermuda-club-fund
+- **Note:** All demo passwords are set via environment variables. See `.env.example` for defaults.
 
-## Showcase Components (Reference for Building)
-Located at `components/showcase/` — these are pre-built UI reference components:
-- `dashboard-showcase.jsx` (685 lines) — GP Dashboard animated showcase: sidebar nav, stats, tranche chart, investor table, activity feed, notifications
-- `fundroom-wizard.jsx` (1,716 lines) — GP Org Setup Wizard reference (V2 canonical is 9 steps at `app/admin/setup/`) + LP Onboarding Wizard (6 steps) with all shared UI components
-- `tranche-pricing-chart.jsx` (518 lines) — Interactive tranche pricing visualization with 3 view modes
-
-Full wizard documentation with Claude Code integration prompt: `docs/GP_LP_Wizard_Reference.md`
-
-Use these as **reference patterns** when building production dashboard, wizard, and chart features. They contain the correct UX flows, data structures, and component patterns.
+## Wizard Reference
+GP Onboarding Wizard (9 steps) is at `app/admin/setup/`. LP Onboarding Wizard (6 steps) is at `app/lp/onboard/`. Full documentation: `docs/GP_LP_Wizard_Reference.md`.
 
 ## System Architecture
 
@@ -39,14 +33,14 @@ Use these as **reference patterns** when building production dashboard, wizard, 
 - **Auth**: NextAuth.js v4 (email/password, magic links, Google OAuth, LinkedIn OAuth)
 - **Rate Limiting**: Upstash Redis via `@upstash/ratelimit`
 - **Error Monitoring**: Rollbar (server + client)
-- **Analytics**: Tinybird (server events) + PostHog (client) + Vercel Analytics
+- **Analytics**: PostHog (server + client) + Vercel Analytics
 - **E-Signature**: FundRoom Sign (native, zero external cost)
 - **Deployment**: Vercel (Next.js, Node 22.x, auto-deploy from `main` branch)
 - **Testing**: Jest 30 + React Testing Library
 
 ### Key Architectural Decisions
 - **Domain Architecture**: Host-based routing (`proxy.ts`) supporting marketing, main application, admin portal, login portal, and custom-branded organization portals.
-- **Dual-Database Architecture**: Primary Supabase Postgres with Replit Postgres as an async hot backup, managed by a Prisma extension chain. `BACKUP_DB_ENABLED=false` for production.
+- **Database**: Supabase PostgreSQL (primary). Optional backup database available via `BACKUP_DB_ENABLED` flag (disabled in production).
 - **Multi-Tenancy**: Data is hierarchically organized (`Organization` -> `Team` -> `Fund/Raise` -> `User`) and all data rows are scoped by `org_id`.
 - **Operating Modes**: Supports GP FUND (LPA-based), STARTUP (SAFE/priced rounds), and DATAROOM_ONLY (free tier).
 - **Authentication**: NextAuth.js with JWT sessions and `requireAdminAccess` guards.
@@ -62,7 +56,7 @@ Use these as **reference patterns** when building production dashboard, wizard, 
 - **Regulation D Compliance**: Exemption selector, Form D tracking with amendment reminders and JSON/CSV export.
 - **SEC Compliance**: Bad Actor 506(d) certification, 8 investor representations, 506(c) enhanced accreditation, immutable SHA-256 hash-chained audit log.
 - **Audit Logging**: Prisma extension for immutable, hash-chained organization and signature audit logs.
-- **Storage**: Supports multiple providers including S3, Vercel Blob, Replit Object Storage, and local storage, with dual-provider capability.
+- **Storage**: Multiple providers supported (S3, Vercel Blob, local) with dual-provider capability.
 - **Rate Limiter**: Redis-backed, fail-open, 10-tier rate limiting system protecting all API routes via blanket middleware and per-route limiters.
 - **Custom Domain Middleware**: Handles routing for custom domains, bypassing dataroom rewrite logic for authentication and API routes.
 - **Error Reporting**: `reportError` utility for consistent logging; all HTTP 500 responses return generic "Internal server error" with full error sanitization.
@@ -115,9 +109,9 @@ Use these as **reference patterns** when building production dashboard, wizard, 
 - **Email**: Resend (2-tier: platform @fundroom.ai + org-branded)
 - **KYC**: Persona (adapter built, self-acknowledge for MVP)
 - **ACH**: Plaid (Phase 2 -- manual wire for MVP)
-- **Analytics**: Tinybird, PostHog, Vercel Analytics
+- **Analytics**: PostHog, Vercel Analytics
 - **Billing**: Stripe (Phase 2 -- using PAYWALL_BYPASS for MVP launch)
 - **Error Monitoring**: Rollbar (3 tokens: read, server, client)
 - **Authentication**: Google OAuth (dual credentials: FundRoom primary, BFG fallback)
 - **Deployment/Hosting**: Vercel (5 production domains, API access via VERCEL_TOKEN)
-- **Storage**: S3 + CloudFront (primary), Vercel Blob (Vercel deploys), Replit Object Storage (dev)
+- **Storage**: S3 + CloudFront (primary), Vercel Blob (Vercel deploys)

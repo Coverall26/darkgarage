@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { SignatureDocumentCreateSchema, SignatureDocumentCreateInput } from "@/lib/validations/teams";
+import { DocumentStorageType, SignatureRecipientRole } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
@@ -18,7 +21,7 @@ export default async function handler(
   const userTeam = await prisma.userTeam.findFirst({
     where: {
       teamId,
-      userId: (session.user as any).id,
+      userId: session.user.id,
     },
   });
 
@@ -29,7 +32,7 @@ export default async function handler(
   if (req.method === "GET") {
     return handleGet(req, res, teamId);
   } else if (req.method === "POST") {
-    return handlePost(req, res, teamId, (session.user as any).id);
+    return handlePost(req, res, teamId, session.user.id);
   } else {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -46,7 +49,7 @@ async function handleGet(
     const limitNum = parseInt(limit as string, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = { teamId };
+    const where: Record<string, unknown> = { teamId };
     if (status) {
       where.status = status;
     }
@@ -95,6 +98,10 @@ async function handlePost(
   userId: string
 ) {
   try {
+    const parsed = validateBodyPagesRouter(req.body, SignatureDocumentCreateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
     const {
       title,
       description,
@@ -108,21 +115,17 @@ async function handlePost(
       fundId,
       documentType,
       requiredForOnboarding,
-    } = req.body;
-
-    if (!title || !file) {
-      return res.status(400).json({ error: "Title and file are required" });
-    }
+    } = parsed.data;
 
     const document = await prisma.signatureDocument.create({
       data: {
         title,
         description,
         file,
-        storageType,
+        storageType: storageType as DocumentStorageType,
         emailSubject,
         emailMessage,
-        status,
+        status: status as "DRAFT" | "SENT",
         expirationDate: expirationDate ? new Date(expirationDate) : null,
         teamId,
         createdById: userId,
@@ -130,12 +133,12 @@ async function handlePost(
         documentType: documentType || null,
         requiredForOnboarding: requiredForOnboarding === true,
         recipients: {
-          create: recipients.map((r: any, index: number) => ({
-            name: r.name,
-            email: r.email,
-            role: r.role || "SIGNER",
+          create: recipients.map((r: NonNullable<SignatureDocumentCreateInput["recipients"]>[number], index: number) => ({
+            name: r.name!,
+            email: r.email!,
+            role: (r.role || "SIGNER") as SignatureRecipientRole,
             signingOrder: r.signingOrder || index + 1,
-            status: "PENDING",
+            status: "PENDING" as const,
           })),
         },
       },

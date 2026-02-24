@@ -1,17 +1,19 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { ViewerNoteSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method === "POST") {
-    const { viewId, content, documentId, dataroomId, linkId, pageNumber, viewerEmail, viewerName } = req.body;
-
-    if (!viewId || !content) {
-      return res.status(400).json({ error: "View ID and content are required" });
+    const parsed = validateBodyPagesRouter(req.body, ViewerNoteSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
     }
+    const { viewId, content, documentId, dataroomId, linkId, pageNumber, viewerEmail, viewerName } = parsed.data;
 
     try {
       const view = await prisma.view.findUnique({

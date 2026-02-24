@@ -4,6 +4,8 @@ import { logPaymentEvent } from "@/lib/audit/audit-logger";
 import { reportError } from "@/lib/error";
 import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { ProcessPaymentSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -15,15 +17,9 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const body = await req.json();
-    const { subscriptionId } = body;
-
-    if (!subscriptionId) {
-      return NextResponse.json(
-        { error: "Subscription ID is required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, ProcessPaymentSchema);
+    if (parsed.error) return parsed.error;
+    const { subscriptionId } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { id: auth.userId },
@@ -156,6 +152,7 @@ export async function POST(req: NextRequest) {
         currency: "USD",
         description: `Subscription payment for ${subscription.fund?.name || "fund"}`,
         fundId: subscription.fundId,
+        teamId: subscription.fund?.teamId || undefined,
         status: "PENDING",
         statusMessage: "Manual processing required",
         metadata: { subscriptionId: subscription.id },

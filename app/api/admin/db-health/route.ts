@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { isBackupDbEnabled } from "@/lib/feature-flags";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { requireAdminAppRouter } from "@/lib/auth/rbac";
@@ -32,7 +33,7 @@ export async function GET() {
   const primaryUrl =
     process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
   const backupUrl = process.env.REPLIT_DATABASE_URL;
-  const backupEnabled = process.env.BACKUP_DB_ENABLED !== "false";
+  const backupEnabled = isBackupDbEnabled();
 
   if (!primaryUrl) {
     return NextResponse.json(

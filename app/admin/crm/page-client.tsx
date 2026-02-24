@@ -14,6 +14,7 @@ import {
   Lock,
   RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,6 +25,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import dynamic from "next/dynamic";
 import { useTier } from "@/lib/hooks/use-tier";
 import { ContactTable } from "@/components/crm/ContactTable";
@@ -180,6 +191,10 @@ export default function CRMPageClient() {
   // Recalculate engagement
   const [recalculating, setRecalculating] = useState(false);
 
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
@@ -267,26 +282,60 @@ export default function CRMPageClient() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) {
+        toast.success(`Moved to ${formatStageLabel(newStatus, productMode)}`);
         fetchContacts();
-        if (sidebarContactId === contactId) {
-          // Sidebar will refresh on its own
-        }
+      } else {
+        toast.error("Failed to update status");
       }
     } catch {
-      // Silent fail, user can retry
+      toast.error("Failed to update status");
     }
   };
 
-  const handleDelete = async (contactId: string) => {
+  const handleDeleteConfirm = async (contactId: string) => {
     try {
       const res = await fetch(`/api/contacts/${contactId}`, { method: "DELETE" });
       if (res.ok) {
+        toast.success("Contact deleted");
         setSidebarContactId(null);
         fetchContacts();
         mutateTier();
+      } else {
+        toast.error("Failed to delete contact");
       }
     } catch {
-      // Silent fail
+      toast.error("Failed to delete contact");
+    }
+  };
+
+  const handleDeleteRequest = (contactId: string) => {
+    setDeleteTarget(contactId);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    let succeeded = 0;
+    let failed = 0;
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/contacts/${id}`, { method: "DELETE" });
+        if (res.ok) succeeded++;
+        else failed++;
+      } catch {
+        failed++;
+      }
+    }
+    setBulkDeleting(false);
+    if (succeeded > 0) {
+      toast.success(`Deleted ${succeeded} contact${succeeded > 1 ? "s" : ""}`);
+      setSelectedIds(new Set());
+      setSidebarContactId(null);
+      fetchContacts();
+      mutateTier();
+    }
+    if (failed > 0) {
+      toast.error(`Failed to delete ${failed} contact${failed > 1 ? "s" : ""}`);
     }
   };
 
@@ -314,6 +363,7 @@ export default function CRMPageClient() {
         setAddError(data.error || "Failed to add contact");
         return;
       }
+      toast.success("Contact added");
       setShowAddForm(false);
       setAddForm({ firstName: "", lastName: "", email: "", company: "" });
       fetchContacts();
@@ -338,10 +388,13 @@ export default function CRMPageClient() {
         method: "POST",
       });
       if (res.ok) {
+        toast.success("Engagement scores refreshed");
         fetchContacts();
+      } else {
+        toast.error("Failed to recalculate scores");
       }
     } catch {
-      // Silent fail, user can retry
+      toast.error("Failed to recalculate scores");
     } finally {
       setRecalculating(false);
     }
@@ -642,6 +695,34 @@ export default function CRMPageClient() {
       {/* Main content */}
       {viewMode === "table" && (
         <>
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && canContribute && (
+            <div className="flex items-center gap-3 rounded-lg border border-blue-500/30 bg-blue-950/30 px-4 py-2.5">
+              <span className="text-sm font-medium text-blue-300">
+                {selectedIds.size} selected
+              </span>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="h-7 text-xs"
+                >
+                  Deselect All
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="h-7 text-xs"
+                >
+                  {bulkDeleting ? "Deleting..." : `Delete ${selectedIds.size}`}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <ContactTable
             contacts={contacts as import("@/components/crm/ContactTable").ContactRow[]}
             tier={tier}
@@ -652,7 +733,9 @@ export default function CRMPageClient() {
             onToggleAll={handleToggleAll}
             onRowClick={(c) => setSidebarContactId(c.id)}
             onStatusChange={handleStatusChange}
-            onDelete={handleDelete}
+            onDelete={handleDeleteRequest}
+            onSendEmail={(c) => handleComposeEmail(c as unknown as Contact)}
+            onEditTags={(c) => setSidebarContactId(c.id)}
             sortBy={sortBy}
             sortDir={sortDir}
             onSort={handleSort}
@@ -738,12 +821,39 @@ export default function CRMPageClient() {
             }
             onClose={() => setComposeTarget(null)}
             onSent={() => {
+              toast.success("Email sent");
               setComposeTarget(null);
               fetchContacts();
             }}
           />
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete contact?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this contact and all associated activity data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (deleteTarget) {
+                  handleDeleteConfirm(deleteTarget);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

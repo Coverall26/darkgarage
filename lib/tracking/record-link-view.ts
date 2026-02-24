@@ -2,7 +2,6 @@ import { NextRequest, userAgent } from "next/server";
 
 import { geolocation, ipAddress } from "@vercel/functions";
 
-import { recordLinkViewTB } from "@/lib/tinybird";
 import { isBot } from "@/lib/utils/user-agent";
 
 import sendNotification from "../api/notification-helper";
@@ -101,14 +100,6 @@ export async function recordLinkView({
   };
 
   await Promise.all([
-    // record link view in Tinybird (optional - gracefully handle if not configured)
-    process.env.TINYBIRD_TOKEN
-      ? recordLinkViewTB(clickData).catch((err) => {
-          console.warn("Tinybird recording failed (optional):", err.message);
-          return null;
-        })
-      : Promise.resolve(null),
-
     // send email notification
     enableNotification ? sendNotification({ viewId, locationData }) : null,
 

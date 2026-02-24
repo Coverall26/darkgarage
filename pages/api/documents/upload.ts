@@ -8,6 +8,7 @@ import { uploadInvestorDocument } from "@/lib/storage/investor-storage";
 import { reportError } from "@/lib/error";
 import { uploadRateLimiter } from "@/lib/security/rate-limiter";
 import { resolveDocumentStorageType } from "@/lib/storage/resolve-storage-type";
+import { z } from "zod";
 
 const LPDocumentTypeValues = [
   "NDA",
@@ -27,6 +28,24 @@ const LPDocumentTypeValues = [
   "OTHER",
 ] as const;
 
+const DocumentUploadSchema = z.object({
+  title: z.string().min(1, "Title is required").max(500),
+  documentType: z.enum(LPDocumentTypeValues, {
+    errorMap: () => ({ message: `Invalid document type. Must be one of: ${LPDocumentTypeValues.join(", ")}` }),
+  }),
+  fundId: z.string().min(1, "Fund ID is required"),
+  uploadSource: z.enum(["LP_UPLOADED", "LP_UPLOADED_EXTERNAL", "GP_UPLOADED_FOR_LP"]).optional(),
+  investorId: z.string().optional(),
+  lpNotes: z.string().max(2000).optional(),
+  notes: z.string().max(2000).optional(),
+  isOfflineSigned: z.boolean().optional(),
+  externalSigningDate: z.string().optional(),
+  investmentId: z.string().optional(),
+  fileData: z.string().min(1, "File data is required"),
+  fileName: z.string().min(1, "File name is required").max(500),
+  mimeType: z.string().optional(),
+});
+
 export const config = {
   api: {
     bodyParser: {
@@ -34,22 +53,6 @@ export const config = {
     },
   },
 };
-
-interface UploadRequest {
-  title: string;
-  documentType: string;
-  fundId: string;
-  uploadSource?: string;
-  investorId?: string;
-  lpNotes?: string;
-  notes?: string;
-  isOfflineSigned?: boolean;
-  externalSigningDate?: string;
-  investmentId?: string;
-  fileData: string;
-  fileName: string;
-  mimeType?: string;
-}
 
 /**
  * POST /api/documents/upload
@@ -85,6 +88,13 @@ export default async function handler(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    const parsed = DocumentUploadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: parsed.error.issues[0]?.message || "Invalid request body",
+      });
+    }
+
     const {
       title,
       documentType,
@@ -99,20 +109,7 @@ export default async function handler(
       fileData,
       fileName,
       mimeType,
-    } = req.body as UploadRequest;
-
-    if (!title || !documentType || !fundId || !fileData || !fileName) {
-      return res.status(400).json({
-        error:
-          "Missing required fields: title, documentType, fundId, fileData, fileName",
-      });
-    }
-
-    if (!LPDocumentTypeValues.includes(documentType as (typeof LPDocumentTypeValues)[number])) {
-      return res.status(400).json({
-        error: `Invalid document type. Must be one of: ${LPDocumentTypeValues.join(", ")}`,
-      });
-    }
+    } = parsed.data;
 
     const fund = await prisma.fund.findUnique({
       where: { id: fundId },

@@ -11,6 +11,8 @@ import { publishServerEvent } from "@/lib/tracking/server-events";
 import { captureFromLPRegistration } from "@/lib/crm/contact-upsert-job";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { sendAccreditationConfirmedEmail } from "@/lib/emails/send-accreditation-confirmed";
+import { validateBody } from "@/lib/middleware/validate";
+import { LpRegisterSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +49,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const parsed = await validateBody(req, LpRegisterSchema);
+    if (parsed.error) return parsed.error;
     const {
       name,
-      email,
+      email: normalizedEmail,
       phone,
       password,
       entityType,
@@ -63,45 +67,7 @@ export async function POST(req: NextRequest) {
       fundId,
       teamId,
       referralSource,
-    } = await req.json();
-
-    if (!name || !email) {
-      return NextResponse.json(
-        { error: "Name and email are required" },
-        { status: 400 },
-      );
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Invalid email format" },
-        { status: 400 },
-      );
-    }
-
-    const normalizedEmail = email.toLowerCase().trim();
-
-    // Input length validations — prevent oversized payloads
-    if (typeof name === "string" && name.length > 200) {
-      return NextResponse.json({ error: "Name exceeds 200 characters" }, { status: 400 });
-    }
-    if (email.length > 254) {
-      return NextResponse.json({ error: "Email exceeds 254 characters" }, { status: 400 });
-    }
-    if (phone && typeof phone === "string" && phone.length > 30) {
-      return NextResponse.json({ error: "Phone exceeds 30 characters" }, { status: 400 });
-    }
-    // bcrypt silently truncates passwords > 72 bytes — reject to prevent confusion
-    if (password && typeof password === "string" && password.length > 72) {
-      return NextResponse.json({ error: "Password exceeds 72 characters" }, { status: 400 });
-    }
-    if (fundId && typeof fundId === "string" && fundId.length > 100) {
-      return NextResponse.json({ error: "Invalid fundId" }, { status: 400 });
-    }
-    if (teamId && typeof teamId === "string" && teamId.length > 100) {
-      return NextResponse.json({ error: "Invalid teamId" }, { status: 400 });
-    }
+    } = parsed.data;
 
     // Paywall check: LP registration requires an active FundRoom subscription
     // Only enforced when a specific fund/team is targeted (from dataroom CTA)
@@ -289,11 +255,12 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        // Update investor's fundId
+        // Update investor's fundId and teamId (multi-tenant defense-in-depth)
         await prisma.investor.update({
           where: { id: user.investorProfile.id },
           data: {
             fundId: fund.id,
+            teamId: fund.teamId,
             fundData: {
               ...(typeof user.investorProfile.fundData === "object" && user.investorProfile.fundData !== null
                 ? user.investorProfile.fundData as Record<string, unknown>
@@ -321,6 +288,7 @@ export async function POST(req: NextRequest) {
             data: {
               fundId,
               investorId: user.investorProfile.id,
+              teamId: fund.teamId,
               commitmentAmount: 0,
               fundedAmount: 0,
               status: "APPLIED",

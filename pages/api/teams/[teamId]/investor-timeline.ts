@@ -55,7 +55,7 @@ export default async function handler(
 
     const events: TimelineEvent[] = [];
 
-    const viewWhere: any = {
+    const viewWhere: Record<string, unknown> = {
       link: { teamId: teamId as string },
     };
     if (investorId) {
@@ -118,7 +118,7 @@ export default async function handler(
     const docIds = teamDocs.map((d) => d.id);
 
     if (docIds.length > 0) {
-      const sigWhere: any = {
+      const sigWhere: Record<string, unknown> = {
         documentId: { in: docIds },
       };
       if (search) {

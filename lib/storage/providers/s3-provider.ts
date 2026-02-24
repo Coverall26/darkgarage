@@ -128,8 +128,9 @@ export class S3StorageProvider implements StorageProvider {
       }
 
       return data;
-    } catch (error: any) {
-      if (error.name === "NoSuchKey" || error.$metadata?.httpStatusCode === 404) {
+    } catch (error: unknown) {
+      const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (s3Error.name === "NoSuchKey" || s3Error.$metadata?.httpStatusCode === 404) {
         return null;
       }
       console.error("Error downloading from S3:", error);
@@ -161,8 +162,9 @@ export class S3StorageProvider implements StorageProvider {
       }
 
       return response.Body as Readable;
-    } catch (error: any) {
-      if (error.name === "NoSuchKey" || error.$metadata?.httpStatusCode === 404) {
+    } catch (error: unknown) {
+      const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (s3Error.name === "NoSuchKey" || s3Error.$metadata?.httpStatusCode === 404) {
         return null;
       }
       console.error("Error streaming from S3:", error);
@@ -192,8 +194,9 @@ export class S3StorageProvider implements StorageProvider {
       });
       await this.client.send(command);
       return true;
-    } catch (error: any) {
-      if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+    } catch (error: unknown) {
+      const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (s3Error.name === "NotFound" || s3Error.$metadata?.httpStatusCode === 404) {
         return false;
       }
       throw error;
@@ -237,8 +240,9 @@ export class S3StorageProvider implements StorageProvider {
         contentType: response.ContentType,
         metadata: response.Metadata,
       };
-    } catch (error: any) {
-      if (error.name === "NotFound" || error.$metadata?.httpStatusCode === 404) {
+    } catch (error: unknown) {
+      const s3Error = error as { name?: string; $metadata?: { httpStatusCode?: number } };
+      if (s3Error.name === "NotFound" || s3Error.$metadata?.httpStatusCode === 404) {
         return null;
       }
       throw error;

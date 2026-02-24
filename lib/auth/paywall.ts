@@ -1,3 +1,4 @@
+import { isPaywallBypassed } from "@/lib/feature-flags";
 import prisma from "@/lib/prisma";
 
 /**
@@ -8,7 +9,7 @@ import prisma from "@/lib/prisma";
  * require an active FundroomActivation record — or a paywall bypass.
  *
  * Bypass priority:
- *   1. PAYWALL_BYPASS env var (MVP fallback)
+ *   1. FF_PAYWALL_BYPASS feature flag (MVP fallback, reads PAYWALL_BYPASS env)
  *   2. PlatformSettings.paywallEnforced = false (DB-driven platform toggle)
  *   3. PlatformSettings.paywallBypassUntil > now (time-limited bypass)
  *   4. FundroomActivation record with status ACTIVE
@@ -64,7 +65,7 @@ export function clearPlatformSettingsCache(): void {
 /**
  * Check if a team has an active FundRoom subscription.
  * Returns true if:
- *   1. PAYWALL_BYPASS env var is set to "true" (MVP launch), OR
+ *   1. FF_PAYWALL_BYPASS feature flag is enabled (MVP launch), OR
  *   2. PlatformSettings.paywallEnforced is false (DB-driven platform toggle), OR
  *   3. PlatformSettings.paywallBypassUntil is in the future, OR
  *   4. A FundroomActivation record with status ACTIVE exists for the team.
@@ -75,8 +76,8 @@ export async function requireFundroomActive(
   teamId: string,
   fundId?: string,
 ): Promise<boolean> {
-  // 1. Environment variable bypass (MVP fallback)
-  if (process.env.PAYWALL_BYPASS === "true") {
+  // 1. Feature flag bypass (MVP fallback)
+  if (isPaywallBypassed()) {
     return true;
   }
 
@@ -118,7 +119,7 @@ export async function requireFundroomActive(
 export async function requireFundroomActiveByFund(
   fundId: string,
 ): Promise<boolean> {
-  if (process.env.PAYWALL_BYPASS === "true") {
+  if (isPaywallBypassed()) {
     return true;
   }
 

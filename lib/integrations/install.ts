@@ -9,7 +9,7 @@ interface InstallIntegration {
   userId: string;
   teamId: string;
   integrationId: string;
-  credentials?: Record<string, any>;
+  credentials?: Record<string, unknown>;
 }
 
 // Install an integration for a user in a workspace

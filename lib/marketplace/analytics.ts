@@ -4,9 +4,9 @@ import type { DealStage, DealType } from "@prisma/client";
  * Marketplace analytics event tracking.
  * Uses a fire-and-forget pattern — analytics failures never block business logic.
  *
- * Events are buffered in-memory and flushed in batches to Tinybird via
- * publishServerEvent. Each marketplace event is mapped to a server_events__v1
- * record with `marketplace_` prefix on the event_name.
+ * Events are buffered in-memory and flushed in batches to PostHog via
+ * publishServerEvent. Each marketplace event has a `marketplace_` prefix
+ * on the event_name.
  */
 
 export type MarketplaceEvent =
@@ -76,8 +76,7 @@ function extractServerEventProps(
 }
 
 /**
- * Flush buffered events to Tinybird via publishServerEvent.
- * Each event is published as `marketplace_{event_type}` to server_events__v1.
+ * Flush buffered events to PostHog via publishServerEvent.
  */
 function flushEvents(): void {
   if (flushTimer) {
@@ -89,14 +88,14 @@ function flushEvents(): void {
 
   const events = eventBuffer.splice(0, eventBuffer.length);
 
-  // Publish to Tinybird (fire-and-forget, never blocks)
+  // Publish to PostHog (fire-and-forget, never blocks)
   publishMarketplaceEvents(events).catch((err) =>
     console.warn("[Marketplace Analytics] Batch publish error:", err),
   );
 }
 
 /**
- * Publish buffered marketplace events to Tinybird.
+ * Publish buffered marketplace events to PostHog.
  * Lazily imports publishServerEvent to avoid circular deps and server-only issues.
  */
 async function publishMarketplaceEvents(

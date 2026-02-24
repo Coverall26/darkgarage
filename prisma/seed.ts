@@ -367,6 +367,23 @@ async function main() {
     for (const tx of importData.data.transactions) {
       try {
         const investorId = idMappings.investors[tx.investorId] || tx.investorId;
+        const resolvedFundId = tx.fundId ? idMappings.funds[tx.fundId] || tx.fundId : null;
+
+        // Dedup check: skip if a matching transaction already exists
+        const existing = await prisma.transaction.findFirst({
+          where: {
+            investorId,
+            fundId: resolvedFundId,
+            amount: new Decimal(tx.amount),
+            type: tx.type,
+          },
+          select: { id: true },
+        });
+
+        if (existing) {
+          results.transactions.skipped++;
+          continue;
+        }
 
         if (!dryRun) {
           await prisma.transaction.create({
@@ -382,7 +399,7 @@ async function main() {
               distributionId: tx.distributionId
                 ? idMappings.distributions[tx.distributionId] || tx.distributionId
                 : null,
-              fundId: tx.fundId ? idMappings.funds[tx.fundId] || tx.fundId : null,
+              fundId: resolvedFundId,
               status: tx.status || "PENDING",
               statusMessage: tx.statusMessage,
             },

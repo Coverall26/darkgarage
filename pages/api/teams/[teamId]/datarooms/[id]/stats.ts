@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { getTotalDataroomDuration } from "@/lib/tinybird";
 import { CustomUser } from "@/lib/types";
 
 import { authOptions } from "@/lib/auth/auth-options";
@@ -103,24 +102,30 @@ export default async function handle(
         (view) => !excludedViews.map((view) => view.id).includes(view.id),
       );
 
-      let duration = { data: [] as { viewId: string; sum_duration: number }[] };
-      let total_duration = 0;
-      
-      try {
-        duration = await getTotalDataroomDuration({
+      // Query PageView for dataroom duration
+      const excludedViewIds = excludedViews.map((view) => view.id);
+      const durationResult = await prisma.pageView.groupBy({
+        by: ["viewId"],
+        where: {
           dataroomId: dataroomId,
-          excludedLinkIds: [],
-          excludedViewIds: excludedViews.map((view) => view.id),
-          since: 0,
-        });
+          viewId: excludedViewIds.length > 0 ? { notIn: excludedViewIds } : undefined,
+        },
+        _sum: {
+          duration: true,
+        },
+      });
 
-        total_duration = duration.data.reduce(
-          (totalDuration, data) => totalDuration + data.sum_duration,
-          0,
-        );
-      } catch (tinybirdError) {
-        // Tinybird not configured, skipping duration analytics
-      }
+      const duration = {
+        data: durationResult.map((row) => ({
+          viewId: row.viewId,
+          sum_duration: Math.round((row._sum.duration || 0) / 1000),
+        })),
+      };
+
+      const total_duration = duration.data.reduce(
+        (totalDuration, data) => totalDuration + data.sum_duration,
+        0,
+      );
 
       const stats = {
         dataroomViews: dataroomViews,

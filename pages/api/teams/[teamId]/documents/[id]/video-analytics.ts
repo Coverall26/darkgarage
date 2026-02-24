@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { getServerSession } from "next-auth/next";
 
 import prisma from "@/lib/prisma";
-import { getVideoEventsByDocument } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
 import { reportError } from "@/lib/error";
 
@@ -219,34 +218,9 @@ export default async function handle(
       return res.status(400).json({ error: "Video length not found" });
     }
 
-    try {
-      // Fetch video events from Tinybird
-      const response = await getVideoEventsByDocument({
-        document_id: documentId,
-      });
-
-      if (!response || !response.data) {
-        return res
-          .status(500)
-          .json({ error: "Internal server error" });
-      }
-
-      // Validate that response.data is an array
-      if (!Array.isArray(response.data)) {
-        return res
-          .status(500)
-          .json({ error: "Internal server error" });
-      }
-
-      const analytics = calculateAnalytics(response.data, videoLength);
-      return res.status(200).json(analytics);
-    } catch (error) {
-      reportError(error as Error);
-      console.error("Tinybird error:", error instanceof Error ? error.message : "Unknown error");
-      return res.status(500).json({
-        error: "Internal server error",
-      });
-    }
+    // Video events have no Prisma model - return empty analytics
+    const analytics = calculateAnalytics([], videoLength);
+    return res.status(200).json(analytics);
   } catch (error) {
     reportError(error as Error);
     console.error("Error in video-analytics:", error instanceof Error ? error.message : "Unknown error");

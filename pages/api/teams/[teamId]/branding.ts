@@ -3,9 +3,11 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { redis } from "@/lib/redis";
 import { CustomUser } from "@/lib/types";
+import { BrandingUpdateSchema } from "@/lib/validations/teams";
 
 import { authOptions } from "@/lib/auth/auth-options";
 
@@ -58,13 +60,11 @@ export default async function handle(
     return res.status(200).json(brand);
   } else if (req.method === "POST") {
     // POST /api/teams/:teamId/branding
-    const { logo, banner, brandColor, accentColor, welcomeMessage } = req.body as {
-      logo?: string;
-      banner?: string;
-      brandColor?: string;
-      accentColor?: string;
-      welcomeMessage?: string;
-    };
+    const parsed = validateBodyPagesRouter(req.body, BrandingUpdateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { logo, banner, brandColor, accentColor, welcomeMessage } = parsed.data;
 
     // update team with new branding
     const brand = await prisma.brand.create({
@@ -86,13 +86,11 @@ export default async function handle(
     return res.status(200).json(brand);
   } else if (req.method === "PUT") {
     // PUT /api/teams/:teamId/branding
-    const { logo, banner, brandColor, accentColor, welcomeMessage } = req.body as {
-      logo?: string;
-      banner?: string;
-      brandColor?: string;
-      accentColor?: string;
-      welcomeMessage?: string;
-    };
+    const parsed = validateBodyPagesRouter(req.body, BrandingUpdateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { logo, banner, brandColor, accentColor, welcomeMessage } = parsed.data;
 
     // Use upsert to handle both create and update cases
     const brand = await prisma.brand.upsert({

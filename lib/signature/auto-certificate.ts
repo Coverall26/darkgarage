@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { generateCompletionCertificate, CertificateData, CertificateRecipient, CertificateAuditEvent } from "./completion-certificate";
 import { putFileServer } from "@/lib/files/put-file-server";
+import { SignatureChecksum } from "./checksum";
 import crypto from "crypto";
 
 interface GenerateCertificateResult {
@@ -33,15 +34,11 @@ export async function generateAndStoreCertificate(
       return { success: false, error: "Document not completed" };
     }
 
-    // @ts-ignore - Field exists in schema, TS server may need restart
     if (document.certificateFile) {
       return {
         success: true,
-        // @ts-ignore
         certificateId: document.certificateId || undefined,
-        // @ts-ignore
         certificateHash: document.certificateHash || undefined,
-        // @ts-ignore
         certificateFile: document.certificateFile,
       };
     }
@@ -59,15 +56,15 @@ export async function generateAndStoreCertificate(
       id: r.id,
       name: r.name,
       email: r.email,
-      role: r.role,
-      status: r.status,
+      role: r.role as string,
+      status: r.status as string,
       signedAt: r.signedAt,
       ipAddress: r.ipAddress,
-      signatureChecksum: r.signatureChecksum as any,
+      signatureChecksum: (r.signatureChecksum as unknown as SignatureChecksum) ?? null,
     }));
 
-    const auditTrailData = (document.auditTrail as { entries?: any[] }) || { entries: [] };
-    const auditEvents: CertificateAuditEvent[] = (auditTrailData.entries || []).map((entry: any) => ({
+    const auditTrailData = (document.auditTrail as { entries?: Array<{ event?: string; timestamp?: string | number; recipientEmail?: string | null; ipAddress?: string | null; metadata?: Record<string, unknown> }> }) || { entries: [] };
+    const auditEvents: CertificateAuditEvent[] = (auditTrailData.entries || []).map((entry) => ({
       event: entry.event || "unknown",
       timestamp: new Date(entry.timestamp || Date.now()),
       recipientEmail: entry.recipientEmail || null,

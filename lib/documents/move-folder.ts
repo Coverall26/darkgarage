@@ -21,7 +21,7 @@ export const moveFolderToFolder = async ({
   const key = `/api/teams/${teamId}${folderPathName ? `/folders/${folderPathName.join("/")}` : "/folders?root=true"}`;
   mutate(
     key,
-    (folder: any) => {
+    (folder: Array<{ id: string }> | undefined) => {
       if (!folder) return folder;
       // Filter out the folder that are being moved
       interface Folder {

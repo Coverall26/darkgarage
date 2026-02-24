@@ -9,9 +9,11 @@ import {
 } from "@/lib/crm";
 import { logContactActivity } from "@/lib/crm/contact-service";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { apiRateLimiter } from "@/lib/security/rate-limiter";
 import { CustomUser } from "@/lib/types";
+import { ContactNoteCreateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -66,15 +68,11 @@ export default async function handle(
     }
   } else if (req.method === "POST") {
     try {
-      const { content, isPinned, isPrivate } = req.body;
-
-      if (!content || typeof content !== "string" || content.trim().length === 0) {
-        return res.status(400).json({ error: "Note content is required" });
+      const parsed = validateBodyPagesRouter(req.body, ContactNoteCreateSchema);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
       }
-
-      if (content.length > 10000) {
-        return res.status(400).json({ error: "Note content too long (max 10,000 characters)" });
-      }
+      const { content, isPinned, isPrivate } = parsed.data;
 
       const note = await createContactNote({
         contactId,

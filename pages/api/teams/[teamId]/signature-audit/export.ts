@@ -54,7 +54,7 @@ export default async function handler(
     const documentMap = new Map(documents.map((d) => [d.id, d.title]));
     const teamDocumentIds = documents.map((d) => d.id);
 
-    const whereClause: any = {};
+    const whereClause: Record<string, unknown> = {};
 
     if (documentId && typeof documentId === "string") {
       if (!teamDocumentIds.includes(documentId)) {
@@ -67,14 +67,14 @@ export default async function handler(
 
     if (startDate && typeof startDate === "string") {
       whereClause.createdAt = {
-        ...whereClause.createdAt,
+        ...((whereClause.createdAt as Record<string, unknown>) ?? {}),
         gte: new Date(startDate),
       };
     }
 
     if (endDate && typeof endDate === "string") {
       whereClause.createdAt = {
-        ...whereClause.createdAt,
+        ...((whereClause.createdAt as Record<string, unknown>) ?? {}),
         lte: new Date(endDate + "T23:59:59.999Z"),
       };
     }
@@ -187,7 +187,7 @@ export default async function handler(
     }
 
     return res.status(200).json({
-      auditLogs: auditLogs.map((log: any) => ({
+      auditLogs: auditLogs.map((log) => ({
         ...log,
         documentTitle: documentMap.get(log.documentId),
       })),

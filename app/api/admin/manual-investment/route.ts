@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ManualInvestmentStatus, Prisma } from "@prisma/client";
+import { ManualInvestmentStatus, ManualInvestmentTransferStatus, Prisma, TransferMethod } from "@prisma/client";
 
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { enforceRBACAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { ManualInvestmentSchema } from "@/lib/validations/fund";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +102,8 @@ export async function POST(req: NextRequest) {
   const userId = rbacResult.userId;
 
   try {
-    const body = await req.json();
+    const parsed = await validateBody(req, ManualInvestmentSchema);
+    if (parsed.error) return parsed.error;
     const {
       investorId,
       fundId,
@@ -124,17 +127,7 @@ export async function POST(req: NextRequest) {
       bankName,
       accountLast4,
       notes,
-    } = body;
-
-    if (!investorId || !fundId || !documentType || !documentTitle || !commitmentAmount || !signedDate) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing required fields: investorId, fundId, documentType, documentTitle, commitmentAmount, signedDate",
-        },
-        { status: 400 },
-      );
-    }
+    } = parsed.data;
 
     const investor = await prisma.investor.findUnique({
       where: { id: investorId },
@@ -175,8 +168,8 @@ export async function POST(req: NextRequest) {
         effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
         fundedDate: fundedDate ? new Date(fundedDate) : null,
         maturityDate: maturityDate ? new Date(maturityDate) : null,
-        transferMethod: transferMethod || null,
-        transferStatus: transferStatus || "PENDING",
+        transferMethod: (transferMethod as TransferMethod) || null,
+        transferStatus: (transferStatus as ManualInvestmentTransferStatus) || "PENDING",
         transferDate: transferDate ? new Date(transferDate) : null,
         transferRef: transferRef || null,
         bankName: bankName || null,

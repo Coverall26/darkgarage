@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { QAStatusSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -29,11 +31,11 @@ export default async function handle(
   }
 
   if (req.method === "PATCH") {
-    const { status } = req.body;
-
-    if (!status || !["OPEN", "ANSWERED", "CLOSED"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status" });
+    const parsed = validateBodyPagesRouter(req.body, QAStatusSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
     }
+    const { status } = parsed.data;
 
     try {
       const question = await prisma.dataroomQuestion.update({

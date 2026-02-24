@@ -18,7 +18,7 @@ export interface CertificateAuditEvent {
   timestamp: Date;
   recipientEmail?: string | null;
   ipAddress?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface CertificateData {

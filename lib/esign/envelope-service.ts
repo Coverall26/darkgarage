@@ -7,6 +7,7 @@
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { sendSigningReminderEmail } from "@/lib/emails/send-esign-notifications";
 import crypto from "crypto";
 import type {
   Envelope,
@@ -15,6 +16,7 @@ import type {
   EnvelopeRecipientRole,
   EnvelopeRecipientStatus,
   SigningMode,
+  DocumentStorageType,
 } from "@prisma/client";
 
 // ============================================================================
@@ -102,7 +104,7 @@ export async function createEnvelope(
         reminderDays,
         maxReminders,
         sourceFile: sourceFile || undefined,
-        sourceStorageType: (sourceStorageType as any) || undefined,
+        sourceStorageType: (sourceStorageType as DocumentStorageType) || undefined,
         sourceFileName,
         sourceMimeType,
         sourceFileSize: sourceFileSize ? BigInt(sourceFileSize) : undefined,
@@ -111,7 +113,7 @@ export async function createEnvelope(
           create: recipients.map((r, idx) => ({
             name: r.name,
             email: r.email.toLowerCase().trim(),
-            role: r.role || "SIGNER",
+            role: (r.role || "SIGNER") as EnvelopeRecipientRole,
             order: r.order ?? idx + 1,
             signingToken: generateSigningToken(),
           })),
@@ -389,8 +391,10 @@ export async function sendReminder(
     });
     reminded.push(r.email);
 
-    // TODO: Send actual reminder email via Resend
-    // sendEnvelopeReminderEmail(r, envelope);
+    // Fire-and-forget: Send reminder email via Resend
+    sendSigningReminderEmail(r.id, envelopeId).catch((e) =>
+      reportError(e as Error)
+    );
   }
 
   logAuditEvent({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getFile } from "@/lib/files/get-file";
+import { DocumentStorageType } from "@prisma/client";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
@@ -243,7 +244,7 @@ export async function GET(req: NextRequest) {
             try {
               if (doc.storageKey) {
                 fileUrl = await getFile({
-                  type: doc.storageType as any,
+                  type: doc.storageType as DocumentStorageType,
                   data: doc.storageKey,
                 });
               }

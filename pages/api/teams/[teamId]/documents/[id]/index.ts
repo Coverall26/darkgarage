@@ -6,10 +6,12 @@ import { getServerSession } from "next-auth/next";
 import { TeamError, errorhandler } from "@/lib/errorHandler";
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { deleteFile } from "@/lib/files/delete-file-server";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { ratelimit } from "@/lib/redis";
 import { CustomUser } from "@/lib/types";
 import { serializeFileSize } from "@/lib/utils";
+import { DocumentMoveToFolderSchema, DocumentUpdateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -141,10 +143,13 @@ export default async function handle(
     }
     const userId = (session.user as CustomUser).id;
     const { teamId, id: docId } = req.query as { teamId: string; id: string };
-    const { folderId, currentPathName } = req.body as {
-      folderId: string;
-      currentPathName: string;
-    };
+    const parsed = validateBodyPagesRouter(req.body, DocumentMoveToFolderSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { folderId, currentPathName } = parsed.data;
 
     const document = await prisma.document.update({
       where: {
@@ -208,10 +213,13 @@ export default async function handle(
       }
 
       // Extract allowed fields from request body
-      const { agentsEnabled, description } = req.body as {
-        agentsEnabled?: boolean;
-        description?: string | null;
-      };
+      const parsed = validateBodyPagesRouter(req.body, DocumentUpdateSchema);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: "Validation failed", issues: parsed.issues });
+      }
+      const { agentsEnabled, description } = parsed.data;
 
       if (agentsEnabled !== undefined) {
         const features = await getFeatureFlags({ teamId });
@@ -230,9 +238,6 @@ export default async function handle(
       }
 
       if (description !== undefined) {
-        if (description !== null && description.length > 500) {
-          return res.status(400).json({ error: "Description must be 500 characters or less" });
-        }
         updateData.description = description;
       }
 

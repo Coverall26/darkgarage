@@ -1,3 +1,8 @@
+/**
+ * @deprecated Use App Router equivalent: app/api/teams/[teamId]/datarooms/route.ts
+ * This route will be removed in Phase 3 of the Pages→App Router migration.
+ * All new features should use the App Router version.
+ */
 import { NextApiRequest, NextApiResponse } from "next";
 
 import { authOptions } from "@/lib/auth/auth-options";
@@ -5,10 +10,12 @@ import { Prisma } from "@prisma/client";
 import slugify from "@sindresorhus/slugify";
 import { getServerSession } from "next-auth/next";
 
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import { newId } from "@/lib/id-helper";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { reportError } from "@/lib/error";
+import { DataroomCreateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -172,7 +179,14 @@ export default async function handle(
     const userId = (session.user as CustomUser).id;
 
     const { teamId } = req.query as { teamId: string };
-    const { name } = req.body as { name: string };
+
+    const parsed = validateBodyPagesRouter(req.body, DataroomCreateSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { name } = parsed.data;
 
     try {
       // Check if the user is part of the team (no plan restrictions for self-hosted)

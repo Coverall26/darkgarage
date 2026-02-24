@@ -51,9 +51,6 @@ export function getPlanFromPriceId(
     // Check historical price IDs for known legacy prices
     const historicalPlan = getHistoricalPlanFromPriceId(priceId, env);
     if (historicalPlan) {
-      console.log(
-        `Found historical plan mapping for priceId: ${priceId} -> ${historicalPlan.slug}`,
-      );
       return historicalPlan;
     }
 

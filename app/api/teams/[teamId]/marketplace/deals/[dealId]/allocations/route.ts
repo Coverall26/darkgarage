@@ -7,6 +7,8 @@ import {
 } from "@/lib/marketplace";
 import { verifyNotBot } from "@/lib/security/bot-protection";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { DealAllocationSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -46,11 +48,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, DealAllocationSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
-    if (!body.investorId || !body.allocatedAmount) {
+    if (!body.investorId || !body.amount) {
       return NextResponse.json(
-        { error: "investorId and allocatedAmount are required" },
+        { error: "investorId and amount are required" },
         { status: 400 },
       );
     }
@@ -59,8 +63,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       {
         dealId,
         investorId: body.investorId,
-        allocatedAmount: body.allocatedAmount,
-        allocationNotes: body.allocationNotes,
+        allocatedAmount: body.amount,
+        allocationNotes: body.notes ?? undefined,
       },
       auth.userId,
     );

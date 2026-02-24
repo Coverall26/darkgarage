@@ -1,10 +1,16 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
+import { z } from "zod";
 
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+
+const ApproveSchema = z.object({
+  fundId: z.string().min(1, "fundId is required"),
+  teamId: z.string().min(1, "teamId is required"),
+});
 
 /**
  * PATCH /api/approvals/[approvalId]/approve
@@ -25,11 +31,15 @@ export default async function handler(
   }
 
   const { approvalId } = req.query as { approvalId: string };
-  const { fundId, teamId } = req.body;
 
-  if (!fundId || !teamId) {
-    return res.status(400).json({ error: "fundId and teamId are required" });
+  const parsed = ApproveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message || "Invalid request body",
+    });
   }
+
+  const { fundId, teamId } = parsed.data;
 
   try {
     // Verify GP has admin access

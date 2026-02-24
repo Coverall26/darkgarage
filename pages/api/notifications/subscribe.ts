@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { errorhandler } from "@/lib/errorHandler";
 
 import { authOptions } from "@/lib/auth/auth-options";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { PushSubscribeSchema, PushUnsubscribeSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -15,15 +17,15 @@ export default async function handle(
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const userId = (session.user as any).id;
+  const userId = session.user.id;
 
   if (req.method === "POST") {
     try {
-      const { endpoint, p256dh, auth, userAgent } = req.body;
-
-      if (!endpoint || !p256dh || !auth) {
-        return res.status(400).json({ error: "Missing required fields" });
+      const parsed = validateBodyPagesRouter(req.body, PushSubscribeSchema);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
       }
+      const { endpoint, p256dh, auth, userAgent } = parsed.data;
 
       const subscription = await prisma.pushSubscription.upsert({
         where: { endpoint },
@@ -48,11 +50,11 @@ export default async function handle(
     }
   } else if (req.method === "DELETE") {
     try {
-      const { endpoint } = req.body;
-
-      if (!endpoint) {
-        return res.status(400).json({ error: "Endpoint required" });
+      const parsed = validateBodyPagesRouter(req.body, PushUnsubscribeSchema);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
       }
+      const { endpoint } = parsed.data;
 
       await prisma.pushSubscription.deleteMany({
         where: {

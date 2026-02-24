@@ -8,10 +8,6 @@ jest.mock("@vercel/functions", () => ({
   ipAddress: jest.fn(),
 }));
 
-jest.mock("@/lib/tinybird", () => ({
-  recordLinkViewTB: jest.fn(),
-}));
-
 jest.mock("@/lib/utils/user-agent", () => ({
   isBot: jest.fn(),
 }));
@@ -69,13 +65,11 @@ jest.mock("next/server", () => {
 });
 
 import { geolocation, ipAddress } from "@vercel/functions";
-import { recordLinkViewTB } from "@/lib/tinybird";
 import { isBot } from "@/lib/utils/user-agent";
 import { NextRequest } from "next/server";
 
 const mockGeolocation = geolocation as jest.MockedFunction<typeof geolocation>;
 const mockIpAddress = ipAddress as jest.MockedFunction<typeof ipAddress>;
-const mockRecordLinkViewTB = recordLinkViewTB as jest.MockedFunction<typeof recordLinkViewTB>;
 const mockIsBot = isBot as jest.MockedFunction<typeof isBot>;
 
 // Must import after mocks
@@ -103,7 +97,6 @@ describe("recordLinkView", () => {
     jest.clearAllMocks();
     process.env = { ...originalEnv };
     delete process.env.VERCEL;
-    delete process.env.TINYBIRD_TOKEN;
     mockIsBot.mockReturnValue(false);
     mockGeolocation.mockReturnValue({
       city: "San Francisco",
@@ -114,7 +107,6 @@ describe("recordLinkView", () => {
       region: "sfo1",
     } as any);
     mockIpAddress.mockReturnValue("127.0.0.1");
-    mockRecordLinkViewTB.mockResolvedValue(undefined as any);
   });
 
   afterAll(() => {
@@ -134,7 +126,6 @@ describe("recordLinkView", () => {
     });
 
     expect(result).toBeNull();
-    expect(mockRecordLinkViewTB).not.toHaveBeenCalled();
   });
 
   it("returns click data for valid non-bot request", async () => {
@@ -224,36 +215,4 @@ describe("recordLinkView", () => {
     expect(result!.referer_url).toBe("(direct)");
   });
 
-  it("skips Tinybird recording when TINYBIRD_TOKEN is not set", async () => {
-    await recordLinkView({
-      req: createMockRequest(),
-      clickId: "click-1",
-      viewId: "view-1",
-      linkId: "link-1",
-      teamId: "team-1",
-      enableNotification: false,
-    });
-
-    expect(mockRecordLinkViewTB).not.toHaveBeenCalled();
-  });
-
-  it("records to Tinybird when TINYBIRD_TOKEN is set", async () => {
-    process.env.TINYBIRD_TOKEN = "tb-token";
-
-    await recordLinkView({
-      req: createMockRequest(),
-      clickId: "click-1",
-      viewId: "view-1",
-      linkId: "link-1",
-      teamId: "team-1",
-      enableNotification: false,
-    });
-
-    expect(mockRecordLinkViewTB).toHaveBeenCalledWith(
-      expect.objectContaining({
-        click_id: "click-1",
-        link_id: "link-1",
-      }),
-    );
-  });
 });

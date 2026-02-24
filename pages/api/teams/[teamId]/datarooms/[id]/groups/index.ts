@@ -5,9 +5,11 @@ import { ItemType } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
+import { DataroomGroupCreateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -145,7 +147,13 @@ export default async function handle(
       id: string;
     };
 
-    const { name } = req.body as { name: string };
+    const parsed = validateBodyPagesRouter(req.body, DataroomGroupCreateSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { name } = parsed.data;
 
     try {
       // Check if the user is part of the team

@@ -142,7 +142,7 @@ Referrer-Policy: strict-origin-when-cross-origin
 Permissions-Policy: camera=(self), microphone=(), geolocation=()
 ```
 
-**Content Security Policy** is configured in `lib/middleware/csp.ts` with allowlists for Rollbar, PostHog, Tinybird, and Vercel Analytics.
+**Content Security Policy** is configured in `lib/middleware/csp.ts` with allowlists for Rollbar, PostHog, and Vercel Analytics.
 
 **Dynamic CORS** validates origins against platform domains. Credentials are only allowed with explicit origin matching.
 
@@ -219,7 +219,7 @@ Categories include: document lifecycle (viewed, downloaded, signed, completed), 
 ### Data Protection
 
 - GDPR cookie consent banner with tracking opt-in/opt-out
-- No PII in analytics events (Tinybird server events are fire-and-forget, no PII)
+- No PII in analytics events (PostHog server events are fire-and-forget, no PII)
 - Client-side tracking respects cookie consent state
 
 ---
@@ -246,7 +246,7 @@ Categories include: document lifecycle (viewed, downloaded, signed, completed), 
 1. **Detection**: Rollbar alerts, anomaly detection, audit log monitoring
 2. **Triage**: Assess severity (Critical/High/Medium/Low) and blast radius
 3. **Containment**: Rate limiting escalation, session invalidation, API key rotation
-4. **Remediation**: Deploy fix, verify via automated tests (5,066+ tests)
+4. **Remediation**: Deploy fix, verify via automated tests (5,800+ tests)
 5. **Post-mortem**: Document in session summary, update security controls
 
 ---

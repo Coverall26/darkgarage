@@ -14,6 +14,8 @@ import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth-options";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundFeesUpdateSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -145,93 +147,38 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Fund not found" }, { status: 404 });
     }
 
-    const body = await req.json();
+    const parsed = await validateBody(req, FundFeesUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
+
     const updates: Record<string, any> = {};
     const changes: Record<string, { from: any; to: any }> = {};
 
-    // Validate and collect fee rate updates
     if (body.managementFeePct !== undefined) {
-      const val = parseFloat(body.managementFeePct);
-      if (isNaN(val) || val < 0 || val > 1) {
-        return NextResponse.json(
-          { error: "managementFeePct must be between 0 and 1 (e.g., 0.02 for 2%)" },
-          { status: 400 },
-        );
-      }
-      updates.managementFeePct = val;
+      updates.managementFeePct = body.managementFeePct;
       changes.managementFeePct = {
         from: fund.managementFeePct?.toString() ?? null,
-        to: val,
+        to: body.managementFeePct,
       };
     }
 
     if (body.carryPct !== undefined) {
-      const val = parseFloat(body.carryPct);
-      if (isNaN(val) || val < 0 || val > 1) {
-        return NextResponse.json(
-          { error: "carryPct must be between 0 and 1 (e.g., 0.20 for 20%)" },
-          { status: 400 },
-        );
-      }
-      updates.carryPct = val;
+      updates.carryPct = body.carryPct;
       changes.carryPct = {
         from: fund.carryPct?.toString() ?? null,
-        to: val,
+        to: body.carryPct,
       };
     }
 
     if (body.hurdleRate !== undefined) {
-      const val = parseFloat(body.hurdleRate);
-      if (isNaN(val) || val < 0 || val > 1) {
-        return NextResponse.json(
-          { error: "hurdleRate must be between 0 and 1 (e.g., 0.08 for 8%)" },
-          { status: 400 },
-        );
-      }
-      updates.hurdleRate = val;
+      updates.hurdleRate = body.hurdleRate;
       changes.hurdleRate = {
         from: fund.hurdleRate?.toString() ?? null,
-        to: val,
-      };
-    }
-
-    if (body.orgFeePct !== undefined) {
-      const val = parseFloat(body.orgFeePct);
-      if (isNaN(val) || val < 0 || val > 1) {
-        return NextResponse.json(
-          { error: "orgFeePct must be between 0 and 1 (e.g., 0.005 for 0.5%)" },
-          { status: 400 },
-        );
-      }
-      updates.orgFeePct = val;
-      changes.orgFeePct = {
-        from: fund.orgFeePct?.toString() ?? null,
-        to: val,
-      };
-    }
-
-    if (body.expenseRatioPct !== undefined) {
-      const val = parseFloat(body.expenseRatioPct);
-      if (isNaN(val) || val < 0 || val > 1) {
-        return NextResponse.json(
-          { error: "expenseRatioPct must be between 0 and 1 (e.g., 0.003 for 0.3%)" },
-          { status: 400 },
-        );
-      }
-      updates.expenseRatioPct = val;
-      changes.expenseRatioPct = {
-        from: fund.expenseRatioPct?.toString() ?? null,
-        to: val,
+        to: body.hurdleRate,
       };
     }
 
     if (body.waterfallType !== undefined) {
-      if (!VALID_WATERFALL_TYPES.includes(body.waterfallType)) {
-        return NextResponse.json(
-          { error: `waterfallType must be one of: ${VALID_WATERFALL_TYPES.join(", ")}` },
-          { status: 400 },
-        );
-      }
       updates.waterfallType = body.waterfallType;
       changes.waterfallType = {
         from: fund.waterfallType,
@@ -240,35 +187,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     if (body.aumCalculationFrequency !== undefined) {
-      if (!VALID_FREQUENCIES.includes(body.aumCalculationFrequency)) {
-        return NextResponse.json(
-          { error: `aumCalculationFrequency must be one of: ${VALID_FREQUENCIES.join(", ")}` },
-          { status: 400 },
-        );
-      }
       updates.aumCalculationFrequency = body.aumCalculationFrequency;
       changes.aumCalculationFrequency = {
         from: fund.aumCalculationFrequency,
         to: body.aumCalculationFrequency,
-      };
-    }
-
-    if (body.aumTarget !== undefined) {
-      if (body.aumTarget !== null) {
-        const val = parseFloat(body.aumTarget);
-        if (isNaN(val) || val < 0) {
-          return NextResponse.json(
-            { error: "aumTarget must be a positive number or null" },
-            { status: 400 },
-          );
-        }
-        updates.aumTarget = val;
-      } else {
-        updates.aumTarget = null;
-      }
-      changes.aumTarget = {
-        from: fund.aumTarget?.toString() ?? null,
-        to: body.aumTarget,
       };
     }
 

@@ -66,6 +66,8 @@ interface ContactTableProps {
   onRowClick: (contact: ContactRow) => void;
   onStatusChange: (id: string, status: string) => void;
   onDelete: (id: string) => void;
+  onSendEmail?: (contact: ContactRow) => void;
+  onEditTags?: (contact: ContactRow) => void;
   sortBy: string;
   sortDir: "asc" | "desc";
   onSort: (field: string) => void;
@@ -231,6 +233,8 @@ export function ContactTable({
   onRowClick,
   onStatusChange,
   onDelete,
+  onSendEmail,
+  onEditTags,
   sortBy,
   sortDir,
   onSort,
@@ -389,14 +393,14 @@ export function ContactTable({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {canContribute && (
-                        <DropdownMenuItem>
+                      {canContribute && onSendEmail && (
+                        <DropdownMenuItem onClick={() => onSendEmail(contact)}>
                           <Mail className="mr-2 h-4 w-4" aria-hidden="true" />
                           Send Email
                         </DropdownMenuItem>
                       )}
-                      {canContribute && (
-                        <DropdownMenuItem>
+                      {canContribute && onEditTags && (
+                        <DropdownMenuItem onClick={() => onEditTags(contact)}>
                           <Tag className="mr-2 h-4 w-4" aria-hidden="true" />
                           Edit Tags
                         </DropdownMenuItem>

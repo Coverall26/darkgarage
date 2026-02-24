@@ -6,6 +6,8 @@ import { CustomUser } from "@/lib/types";
 import { sendEmail } from "@/lib/resend";
 import QuestionReply from "@/components/emails/question-reply";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { QAReplySchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -31,11 +33,11 @@ export default async function handle(
   }
 
   if (req.method === "POST") {
-    const { content } = req.body;
-
-    if (!content) {
-      return res.status(400).json({ error: "Reply content is required" });
+    const parsed = validateBodyPagesRouter(req.body, QAReplySchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
     }
+    const { content } = parsed.data;
 
     try {
       const question = await prisma.dataroomQuestion.findFirst({

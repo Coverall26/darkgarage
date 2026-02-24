@@ -80,8 +80,8 @@ export default function ExcelViewer({
 
   const hotRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // @ts-ignore - Handsontable import has not types
-  const hotInstanceRef = useRef<Handsontable | null>(null);
+  // Handsontable is loaded dynamically via script tag, types not available
+  const hotInstanceRef = useRef<any>(null);
 
   const calculateSize = () => {
     if (containerRef.current) {
@@ -251,8 +251,8 @@ export default function ExcelViewer({
 
       const { columnData, rowData } = sheetData[selectedSheetIndex];
 
-      // @ts-ignore - Handsontable import has not types
-      hotInstanceRef.current = new Handsontable(hotRef.current!, {
+      // Handsontable loaded via script tag — constructor accessed from window global
+      hotInstanceRef.current = new (window as any).Handsontable(hotRef.current!, {
         data: rowData,
         readOnly: true,
         disableVisualSelection: true,

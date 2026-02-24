@@ -17,6 +17,10 @@ import {
   autoCreateContactForSigner,
 } from "@/lib/esign/envelope-service";
 import { autoFileEnvelopeDocument } from "@/lib/esign/document-filing-service";
+import {
+  sendSigningCompletedEmails,
+  sendNextSignerEmails,
+} from "@/lib/emails/send-esign-notifications";
 import crypto from "crypto";
 
 // ============================================================================
@@ -360,13 +364,18 @@ export async function recordSignerCompletion(
       recordDocumentCompleted(session.teamId)
     ).catch((e) => reportError(e as Error));
 
-    // Notify CC recipients that signing is complete
-    // TODO: Send completion email to CC recipients
-    // TODO: Send completion email to envelope creator
+    // Fire-and-forget: Notify CC recipients + creator that signing is complete
+    sendSigningCompletedEmails(session.envelopeId).catch((e) =>
+      reportError(e as Error)
+    );
   }
 
-  // TODO: Send email to next recipients (for sequential/mixed mode)
-  // nextRecipients.forEach(email => sendSigningInvitation(email, ...));
+  // Fire-and-forget: Send signing invitation to next recipients (sequential/mixed)
+  if (nextRecipients.length > 0) {
+    sendNextSignerEmails(session.envelopeId, nextRecipients).catch((e) =>
+      reportError(e as Error)
+    );
+  }
 
   return {
     success: true,

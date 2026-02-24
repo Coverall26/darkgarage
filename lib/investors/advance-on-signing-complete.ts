@@ -134,7 +134,7 @@ export async function advanceInvestorOnSigningComplete({
 
       await prisma.investor.update({
         where: { id: investor.id },
-        data: updateData as any,
+        data: updateData as Record<string, unknown> & { fundData: Record<string, unknown> },
       });
     }
 

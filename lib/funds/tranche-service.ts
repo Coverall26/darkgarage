@@ -8,6 +8,7 @@
  */
 
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export interface ActiveTranche {
   id: string;
@@ -95,7 +96,7 @@ export async function quotePurchase(
  * MUST be called inside a Prisma transaction.
  */
 export async function executePurchase(
-  tx: any,
+  tx: Prisma.TransactionClient,
   fundId: string,
   trancheId: string,
   unitsPurchased: number,
@@ -144,7 +145,7 @@ export async function executePurchase(
     where: { fundId },
   });
 
-  const totalRaised = allTiers.reduce((sum: number, t: any) => {
+  const totalRaised = allTiers.reduce((sum: number, t: { unitsTotal: number; unitsAvailable: number; pricePerUnit: { toString(): string } }) => {
     const unitsSold = t.unitsTotal - t.unitsAvailable;
     return sum + unitsSold * parseFloat(t.pricePerUnit.toString());
   }, 0);

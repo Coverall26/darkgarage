@@ -1,10 +1,48 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
+import { z } from "zod";
 
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+
+const ALLOWED_CHANGE_FIELDS = [
+  "entityName",
+  "firstName",
+  "lastName",
+  "email",
+  "entityType",
+  "accreditationStatus",
+  "accreditationCategory",
+  "addressLine1",
+  "addressLine2",
+  "addressCity",
+  "addressState",
+  "addressPostalCode",
+  "addressCountry",
+  "phone",
+] as const;
+
+const ApproveWithChangesSchema = z.object({
+  fundId: z.string().min(1, "fundId is required"),
+  teamId: z.string().min(1, "teamId is required"),
+  changes: z
+    .array(
+      z.object({
+        field: z.enum(ALLOWED_CHANGE_FIELDS, {
+          errorMap: () => ({
+            message: `field must be one of: ${ALLOWED_CHANGE_FIELDS.join(", ")}`,
+          }),
+        }),
+        originalValue: z.string().max(1000).nullable(),
+        newValue: z.string().max(1000),
+      }),
+    )
+    .min(1, "At least one change is required")
+    .max(20, "Maximum 20 changes allowed"),
+  notes: z.string().max(2000).optional(),
+});
 
 /**
  * PATCH /api/approvals/[approvalId]/approve-with-changes
@@ -26,20 +64,15 @@ export default async function handler(
   }
 
   const { approvalId } = req.query as { approvalId: string };
-  const { fundId, teamId, changes, notes } = req.body as {
-    fundId: string;
-    teamId: string;
-    changes: Array<{ field: string; originalValue: string; newValue: string }>;
-    notes?: string;
-  };
 
-  if (!fundId || !teamId) {
-    return res.status(400).json({ error: "fundId and teamId are required" });
+  const parsed = ApproveWithChangesSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message || "Invalid request body",
+    });
   }
 
-  if (!changes || changes.length === 0) {
-    return res.status(400).json({ error: "No changes provided" });
-  }
+  const { fundId, teamId, changes, notes } = parsed.data;
 
   try {
     // Verify GP admin access

@@ -5,6 +5,7 @@
  * Used by both the LP staged-commitment API and the GP tranche management dashboard.
  */
 import prisma from "@/lib/prisma";
+import type { Prisma, InvestmentTranche } from "@prisma/client";
 
 // ─── Status Constants ────────────────────────────────────────────────────────
 
@@ -68,18 +69,19 @@ export async function getFundTranches(fundId: string, filters?: {
   dueBefore?: Date;
   dueAfter?: Date;
 }) {
-  const where: any = {
+  const where: Prisma.InvestmentTrancheWhereInput = {
     investment: { fundId },
   };
 
   if (filters?.status) {
     where.status = filters.status;
   }
-  if (filters?.dueBefore) {
-    where.scheduledDate = { ...(where.scheduledDate || {}), lte: filters.dueBefore };
-  }
-  if (filters?.dueAfter) {
-    where.scheduledDate = { ...(where.scheduledDate || {}), gte: filters.dueAfter };
+  if (filters?.dueBefore && filters?.dueAfter) {
+    where.scheduledDate = { lte: filters.dueBefore, gte: filters.dueAfter };
+  } else if (filters?.dueBefore) {
+    where.scheduledDate = { lte: filters.dueBefore };
+  } else if (filters?.dueAfter) {
+    where.scheduledDate = { gte: filters.dueAfter };
   }
 
   return prisma.investmentTranche.findMany({
@@ -105,7 +107,7 @@ export async function getFundTranches(fundId: string, filters?: {
 
 export interface TrancheTransitionResult {
   success: boolean;
-  tranche?: any;
+  tranche?: InvestmentTranche;
   error?: string;
 }
 
@@ -143,7 +145,7 @@ export async function transitionTrancheStatus(
   }
 
   // Build update data based on target status
-  const updateData: any = {
+  const updateData: Prisma.InvestmentTrancheUpdateInput = {
     status: newStatus,
   };
 

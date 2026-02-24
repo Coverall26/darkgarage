@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth-options";
+import { isPaywallBypassed } from "@/lib/feature-flags";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { clearPlatformSettingsCache } from "@/lib/auth/paywall";
 import { isAdminEmail } from "@/lib/constants/admins";
+import { validateBody } from "@/lib/middleware/validate";
+import { PlatformSettingsUpdateSchema } from "@/lib/validations/teams";
 
 /**
  * GET /api/admin/platform/settings
@@ -51,7 +54,7 @@ export async function GET(req: NextRequest) {
         registrationOpen: true,
         maintenanceMode: false,
         maintenanceMessage: null,
-        envPaywallBypass: process.env.PAYWALL_BYPASS === "true",
+        envPaywallBypass: isPaywallBypassed(),
         updatedAt: null,
         updatedBy: null,
       });
@@ -63,7 +66,7 @@ export async function GET(req: NextRequest) {
       registrationOpen: settings.registrationOpen,
       maintenanceMode: settings.maintenanceMode,
       maintenanceMessage: settings.maintenanceMessage,
-      envPaywallBypass: process.env.PAYWALL_BYPASS === "true",
+      envPaywallBypass: isPaywallBypassed(),
       updatedAt: settings.updatedAt,
       updatedBy: settings.updatedBy,
     });
@@ -80,19 +83,10 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized. Platform owner access required." }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { paywallEnforced, paywallBypassUntil, registrationOpen, maintenanceMode, maintenanceMessage } = body;
-
-    // Validate types
-    if (paywallEnforced !== undefined && typeof paywallEnforced !== "boolean") {
-      return NextResponse.json({ error: "paywallEnforced must be a boolean" }, { status: 400 });
-    }
-    if (registrationOpen !== undefined && typeof registrationOpen !== "boolean") {
-      return NextResponse.json({ error: "registrationOpen must be a boolean" }, { status: 400 });
-    }
-    if (maintenanceMode !== undefined && typeof maintenanceMode !== "boolean") {
-      return NextResponse.json({ error: "maintenanceMode must be a boolean" }, { status: 400 });
-    }
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, PlatformSettingsUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const { paywallEnforced, paywallBypassUntil, registrationOpen, maintenanceMode, maintenanceMessage } = parsed.data;
 
     // Build update data
     const updateData: Record<string, unknown> = { updatedBy: owner.userId };

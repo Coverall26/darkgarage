@@ -6,6 +6,8 @@ import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterMfaRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { MfaVerifySchema } from "@/lib/validations/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +27,9 @@ export async function POST(req: NextRequest) {
   const userId = auth.userId;
 
   try {
-    const body = await req.json();
-    const { code, type = "totp" } = body;
-
-    if (!code || typeof code !== "string") {
-      return NextResponse.json({ error: "Verification code required" }, { status: 400 });
-    }
+    const parsed = await validateBody(req, MfaVerifySchema);
+    if (parsed.error) return parsed.error;
+    const { code, type } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

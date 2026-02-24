@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Resend } from "resend";
+import { Role } from "@prisma/client";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { LpNoteSchema } from "@/lib/validations/lp";
 
 /**
  * POST /api/lp/notes
@@ -17,14 +20,9 @@ export async function POST(req: NextRequest) {
     const auth = await requireLPAuthAppRouter();
     if (auth instanceof NextResponse) return auth;
 
-    const { content } = await req.json();
-
-    if (!content || !content.trim()) {
-      return NextResponse.json(
-        { error: "Note content is required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, LpNoteSchema);
+    if (parsed.error) return parsed.error;
+    const { content } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { id: auth.userId },
@@ -63,12 +61,12 @@ export async function POST(req: NextRequest) {
         const resend = new Resend(process.env.RESEND_API_KEY);
 
         const teamOwner = await prisma.userTeam.findFirst({
-          where: { teamId: defaultTeam.id, role: "OWNER" as any },
+          where: { teamId: defaultTeam.id, role: "OWNER" as Role },
           include: { user: true },
         });
 
         const gpEmail =
-          (teamOwner as any)?.user?.email || process.env.DEFAULT_GP_EMAIL;
+          teamOwner?.user?.email || process.env.DEFAULT_GP_EMAIL;
 
         if (gpEmail) {
           await resend.emails.send({

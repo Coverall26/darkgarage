@@ -5,8 +5,10 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import { copyFileToBucketServer } from "@/lib/files/copy-file-to-bucket-server";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { supportsAdvancedExcelMode } from "@/lib/utils/get-content-type";
+import { EnableExcelAdvancedModeSchema } from "@/lib/validations/teams";
 
 import { authOptions } from "@/lib/auth/auth-options";
 
@@ -38,9 +40,11 @@ export default async function handle(
     }
 
     const { teamId } = req.query;
-    const { enableExcelAdvancedMode } = req.body as {
-      enableExcelAdvancedMode: boolean;
-    };
+    const parsed = validateBodyPagesRouter(req.body, EnableExcelAdvancedModeSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { enableExcelAdvancedMode } = parsed.data;
 
     const team = await prisma.team.findFirst({
       where: {

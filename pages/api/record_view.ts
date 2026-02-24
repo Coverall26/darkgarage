@@ -3,7 +3,6 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 
 import prisma from "@/lib/prisma";
-import { publishPageView } from "@/lib/tinybird";
 import { Geo } from "@/lib/types";
 import { capitalize, log } from "@/lib/utils";
 import { LOCALHOST_GEO_DATA, getGeoData } from "@/lib/utils/geo";
@@ -91,47 +90,6 @@ export default async function handle(
         device: ua.device.type ? capitalize(ua.device.type) : "Desktop",
       },
     });
-
-    if (process.env.TINYBIRD_TOKEN) {
-      try {
-        const { newId } = await import("@/lib/id-helper");
-        const { getDomainWithoutWWW } = await import("@/lib/utils");
-        const referer = req.headers.referer;
-        
-        await publishPageView({
-          id: newId("view"),
-          linkId,
-          documentId,
-          viewId,
-          dataroomId: dataroomId || null,
-          versionNumber: versionNumber || 1,
-          time: Date.now(),
-          duration,
-          pageNumber: pageNumber.toString(),
-          country: geo?.country || "Unknown",
-          city: geo?.city || "Unknown",
-          region: geo?.region || "Unknown",
-          latitude: geo?.latitude || "Unknown",
-          longitude: geo?.longitude || "Unknown",
-          ua: ua.ua || "Unknown",
-          browser: ua.browser.name || "Unknown",
-          browser_version: ua.browser.version || "Unknown",
-          engine: ua.engine.name || "Unknown",
-          engine_version: ua.engine.version || "Unknown",
-          os: ua.os.name || "Unknown",
-          os_version: ua.os.version || "Unknown",
-          device: ua.device.type ? capitalize(ua.device.type) : "Desktop",
-          device_vendor: ua.device.vendor || "Unknown",
-          device_model: ua.device.model || "Unknown",
-          cpu_architecture: ua.cpu?.architecture || "Unknown",
-          bot: ua.isBot,
-          referer: referer ? getDomainWithoutWWW(referer) : "(direct)",
-          referer_url: referer || "(direct)",
-        });
-      } catch (tinybirdError) {
-        console.warn("Tinybird tracking failed (optional):", tinybirdError);
-      }
-    }
 
     res.status(200).json({ message: "View recorded" });
   } catch (error) {

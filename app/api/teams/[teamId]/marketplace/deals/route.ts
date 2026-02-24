@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateGP } from "@/lib/marketplace/auth";
 import { createDeal, listDeals } from "@/lib/marketplace";
-import type { DealFilters } from "@/lib/marketplace";
+import type { DealFilters, CreateDealInput } from "@/lib/marketplace/types";
 import { verifyNotBot } from "@/lib/security/bot-protection";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { DealUpdateSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -66,16 +68,18 @@ export async function POST(
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, DealUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
-    if (!body.title) {
+    if (!body.name) {
       return NextResponse.json(
         { error: "Title is required" },
         { status: 400 },
       );
     }
 
-    const deal = await createDeal(teamId, body, auth.userId);
+    const deal = await createDeal(teamId, body as CreateDealInput, auth.userId);
     return NextResponse.json({ success: true, deal }, { status: 201 });
   } catch (error: unknown) {
     console.error("Create deal error:", error);

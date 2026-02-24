@@ -115,6 +115,26 @@ jest.mock("@/lib/prisma", () => ({
   withDatabaseRetry: jest.fn((fn: () => Promise<unknown>) => fn()),
 }));
 
+jest.mock("@/lib/redis", () => ({
+  __esModule: true,
+  default: null,
+  checkRedisHealth: jest.fn().mockResolvedValue({ connected: false }),
+  ratelimit: jest.fn().mockReturnValue({
+    limit: jest.fn().mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: Date.now() + 60000 }),
+  }),
+}));
+
+jest.mock("@/lib/resend", () => ({
+  __esModule: true,
+  isResendConfigured: jest.fn().mockReturnValue(false),
+  sendEmail: jest.fn().mockResolvedValue(undefined),
+  sendOrgEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/env", () => ({
+  validateEnv: jest.fn().mockReturnValue({ valid: true, missing: [], errors: [] }),
+}));
+
 const { getServerSession } = require("next-auth/next");
 
 // Admin session helper

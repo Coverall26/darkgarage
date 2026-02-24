@@ -3,9 +3,11 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { isAdminRole, isSuperAdminRole } from "@/lib/team/roles";
 import { CustomUser } from "@/lib/types";
+import { ChangeRoleBodySchema } from "@/lib/validations/teams";
 
 import { authOptions } from "@/lib/auth/auth-options";
 
@@ -23,10 +25,11 @@ export default async function handle(
     const { teamId } = req.query as { teamId: string };
     const userId = (session.user as CustomUser).id;
 
-    const { userToBeChanged, role } = req.body as {
-      userToBeChanged: string;
-      role: "MEMBER" | "MANAGER" | "ADMIN";
-    };
+    const parsed = validateBodyPagesRouter(req.body, ChangeRoleBodySchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { userToBeChanged, role } = parsed.data;
 
     try {
       const userTeam = await prisma.userTeam.findFirst({

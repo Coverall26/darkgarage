@@ -14,6 +14,7 @@ import {
   getFilingStats,
 } from "@/lib/esign/document-filing-service";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { DocumentFilingSourceType, DocumentFilingDestType } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -48,8 +49,8 @@ export async function GET(req: NextRequest) {
 
     const filingResult = await getFilingHistory({
       teamId: userTeam.teamId,
-      sourceType: sourceType as any,
-      destinationType: destinationType as any,
+      sourceType: sourceType as DocumentFilingSourceType | undefined,
+      destinationType: destinationType as DocumentFilingDestType | undefined,
       envelopeId,
       contactVaultId,
       page,
@@ -57,12 +58,12 @@ export async function GET(req: NextRequest) {
     });
 
     // Serialize BigInt values
-    const serializedFilings = filingResult.filings.map((f: any) => ({
+    const serializedFilings = filingResult.filings.map((f) => ({
       ...f,
       filedFileSize: f.filedFileSize ? Number(f.filedFileSize) : null,
     }));
 
-    const response: any = {
+    const response: Record<string, unknown> = {
       filings: serializedFilings,
       total: filingResult.total,
       page: filingResult.page,

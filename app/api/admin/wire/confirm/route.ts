@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
@@ -8,6 +9,24 @@ import { requireAdminAppRouter } from "@/lib/auth/rbac";
 import { publishServerEvent } from "@/lib/tracking/server-events";
 import { emitSSE, SSE_EVENTS } from "@/lib/sse/event-emitter";
 import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
+
+const WireConfirmSchema = z.object({
+  transactionId: z.string().min(1, "transactionId is required"),
+  teamId: z.string().min(1, "teamId is required"),
+  fundsReceivedDate: z.string().min(1, "fundsReceivedDate is required").refine(
+    (val) => !isNaN(new Date(val).getTime()),
+    "Invalid fundsReceivedDate",
+  ).refine((val) => {
+    const d = new Date(val);
+    const max = new Date();
+    max.setDate(max.getDate() + 7);
+    return d <= max;
+  }, "fundsReceivedDate cannot be more than 7 days in the future"),
+  amountReceived: z.number().positive("amountReceived must be a positive number").max(100_000_000_000, "amountReceived exceeds maximum allowed ($100B)"),
+  bankReference: z.string().max(100, "bankReference exceeds 100 characters").optional(),
+  confirmationNotes: z.string().max(1000, "confirmationNotes exceeds 1000 characters").optional(),
+  confirmationProofDocumentId: z.string().optional(),
+});
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +52,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    // 1. Validate request body with Zod
+    const parsed = WireConfirmSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid request body" },
+        { status: 400 },
+      );
+    }
+
     const {
       transactionId,
       teamId,
@@ -41,70 +70,13 @@ export async function POST(req: NextRequest) {
       bankReference,
       confirmationNotes,
       confirmationProofDocumentId,
-    } = body;
-
-    // 1. Validate required fields
-    if (!transactionId || typeof transactionId !== "string") {
-      return NextResponse.json({ error: "transactionId is required" }, { status: 400 });
-    }
-    if (!teamId || typeof teamId !== "string") {
-      return NextResponse.json({ error: "teamId is required" }, { status: 400 });
-    }
+    } = parsed.data;
 
     // 2. Authenticate + authorize via RBAC (OWNER/ADMIN/SUPER_ADMIN)
     const auth = await requireAdminAppRouter(teamId);
     if (auth instanceof NextResponse) return auth;
 
-    if (!fundsReceivedDate || typeof fundsReceivedDate !== "string") {
-      return NextResponse.json(
-        { error: "fundsReceivedDate is required (ISO date string)" },
-        { status: 400 },
-      );
-    }
-    if (
-      amountReceived == null ||
-      typeof amountReceived !== "number" ||
-      !Number.isFinite(amountReceived) ||
-      amountReceived <= 0
-    ) {
-      return NextResponse.json(
-        { error: "amountReceived must be a positive number" },
-        { status: 400 },
-      );
-    }
-    if (amountReceived > 100_000_000_000) {
-      return NextResponse.json(
-        { error: "amountReceived exceeds maximum allowed ($100B)" },
-        { status: 400 },
-      );
-    }
-    if (bankReference && typeof bankReference === "string" && bankReference.length > 100) {
-      return NextResponse.json({ error: "bankReference exceeds 100 characters" }, { status: 400 });
-    }
-    if (
-      confirmationNotes &&
-      typeof confirmationNotes === "string" &&
-      confirmationNotes.length > 1000
-    ) {
-      return NextResponse.json(
-        { error: "confirmationNotes exceeds 1000 characters" },
-        { status: 400 },
-      );
-    }
-
-    // Validate date is a valid ISO string and not in the far future
     const receivedDate = new Date(fundsReceivedDate);
-    if (isNaN(receivedDate.getTime())) {
-      return NextResponse.json({ error: "Invalid fundsReceivedDate" }, { status: 400 });
-    }
-    const maxFutureDate = new Date();
-    maxFutureDate.setDate(maxFutureDate.getDate() + 7);
-    if (receivedDate > maxFutureDate) {
-      return NextResponse.json(
-        { error: "fundsReceivedDate cannot be more than 7 days in the future" },
-        { status: 400 },
-      );
-    }
 
     // 3. Fetch transaction and verify it belongs to this team's fund
     const transaction = await prisma.transaction.findUnique({

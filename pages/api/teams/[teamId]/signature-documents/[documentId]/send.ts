@@ -93,7 +93,7 @@ export default async function handler(
   const userTeam = await prisma.userTeam.findFirst({
     where: {
       teamId,
-      userId: (session.user as any).id,
+      userId: session.user.id,
     },
   });
 
@@ -126,7 +126,7 @@ export default async function handler(
       });
     }
 
-    const senderName = (session.user as any).name || "FundRoom";
+    const senderName = session.user.name || "FundRoom";
     const baseUrl = process.env.NEXTAUTH_URL || `https://${req.headers.host}`;
 
     const { sequentialSigning = true } = req.body as { sequentialSigning?: boolean };

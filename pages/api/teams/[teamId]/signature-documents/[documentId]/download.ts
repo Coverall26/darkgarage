@@ -32,7 +32,7 @@ export default async function handler(
   const userTeam = await prisma.userTeam.findFirst({
     where: {
       teamId,
-      userId: (session.user as any).id,
+      userId: session.user.id,
     },
   });
 

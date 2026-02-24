@@ -10,6 +10,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { voidEnvelope } from "@/lib/esign/envelope-service";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { EnvelopeUpdateSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -123,25 +125,23 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, EnvelopeUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     // Build update data — only allow safe fields
     const updateData: Record<string, unknown> = {};
     if (body.title !== undefined) updateData.title = body.title.trim();
     if (body.description !== undefined) updateData.description = body.description?.trim() || null;
     if (body.emailSubject !== undefined) updateData.emailSubject = body.emailSubject?.trim() || null;
-    if (body.emailMessage !== undefined) updateData.emailMessage = body.emailMessage?.trim() || null;
-    if (body.signingMode !== undefined) {
-      if (!["SEQUENTIAL", "PARALLEL", "MIXED"].includes(body.signingMode)) {
-        return NextResponse.json({ error: "Invalid signing mode" }, { status: 400 });
-      }
-      updateData.signingMode = body.signingMode;
-    }
+    if (body.message !== undefined) updateData.emailMessage = body.message?.trim() || null;
+    if (body.signingMode !== undefined) updateData.signingMode = body.signingMode;
     if (body.expiresAt !== undefined) {
       updateData.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
     }
-    if (body.reminderEnabled !== undefined) updateData.reminderEnabled = Boolean(body.reminderEnabled);
-    if (body.reminderDays !== undefined) updateData.reminderDays = Number(body.reminderDays);
+    if (body.reminderEnabled !== undefined) updateData.reminderEnabled = body.reminderEnabled;
+    if (body.reminderDays !== undefined) updateData.reminderDays = body.reminderDays;
     if (body.status === "PREPARING") updateData.status = "PREPARING";
 
     const updated = await prisma.envelope.update({
@@ -210,7 +210,7 @@ export async function DELETE(
     if (envelope.status === "DRAFT" || envelope.status === "PREPARING") {
       // Hard delete draft envelopes
       await prisma.envelope.delete({ where: { id } });
-      return NextResponse.json({ message: "Envelope deleted" });
+      return NextResponse.json({ success: true });
     }
 
     if (envelope.status === "COMPLETED") {

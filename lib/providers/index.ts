@@ -95,7 +95,7 @@ export function getProviders(orgConfig?: OrganizationProviderConfig): ProviderRe
       : getEmailProvider(),
     analytics: orgConfig?.analytics
       ? createAnalyticsProvider({ 
-          provider: orgConfig.analytics.provider as "tinybird" | "posthog" | "mixpanel" | "amplitude",
+          provider: orgConfig.analytics.provider as "posthog" | "mixpanel" | "amplitude",
           apiKey: orgConfig.analytics.apiKey,
         })
       : getAnalyticsProvider(),

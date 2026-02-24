@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { SignatureTemplateCreateSchema } from "@/lib/validations/teams";
+import { DocumentStorageType, Prisma } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
@@ -71,6 +74,10 @@ async function handlePost(
   userId: string
 ) {
   try {
+    const parsed = validateBodyPagesRouter(req.body, SignatureTemplateCreateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
     const {
       name,
       description,
@@ -82,21 +89,17 @@ async function handlePost(
       defaultEmailSubject,
       defaultEmailMessage,
       defaultExpirationDays,
-    } = req.body;
-
-    if (!name || !file) {
-      return res.status(400).json({ error: "Name and file are required" });
-    }
+    } = parsed.data;
 
     const template = await prisma.signatureTemplate.create({
       data: {
         name,
         description,
         file,
-        storageType: storageType || "S3_PATH",
+        storageType: (storageType || "S3_PATH") as DocumentStorageType,
         numPages,
-        defaultRecipients,
-        fields,
+        defaultRecipients: defaultRecipients as Prisma.InputJsonValue,
+        fields: fields as Prisma.InputJsonValue,
         defaultEmailSubject,
         defaultEmailMessage,
         defaultExpirationDays,

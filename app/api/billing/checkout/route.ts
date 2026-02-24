@@ -13,18 +13,17 @@ import { requireAuthAppRouter } from "@/lib/auth/rbac";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { stripeInstance } from "@/ee/stripe";
-import { getCrmPriceId, type CrmPlanSlug } from "@/lib/stripe/crm-products";
-import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { getCrmPriceId } from "@/lib/stripe/crm-products";
+import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { validateBody } from "@/lib/middleware/validate";
+import { BillingCheckoutSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
-const VALID_PLANS: CrmPlanSlug[] = ["CRM_PRO", "FUNDROOM"];
-const VALID_PERIODS = ["monthly", "yearly"] as const;
-
 export async function POST(req: NextRequest) {
   // Rate limit
-  const blocked = await appRouterRateLimit(req);
+  const blocked = await appRouterStrictRateLimit(req);
   if (blocked) return blocked;
 
   try {
@@ -32,25 +31,12 @@ export async function POST(req: NextRequest) {
     const auth = await requireAuthAppRouter();
     if (auth instanceof NextResponse) return auth;
 
-    // Parse body
-    const body = await req.json();
-    const { plan, period } = body as { plan: string; period: string };
+    // Validate body
+    const parsed = await validateBody(req, BillingCheckoutSchema);
+    if (parsed.error) return parsed.error;
+    const { plan, period } = parsed.data;
 
-    if (!plan || !VALID_PLANS.includes(plan as CrmPlanSlug)) {
-      return NextResponse.json(
-        { error: "Invalid plan. Must be CRM_PRO or FUNDROOM." },
-        { status: 400 },
-      );
-    }
-
-    if (!period || !VALID_PERIODS.includes(period as typeof VALID_PERIODS[number])) {
-      return NextResponse.json(
-        { error: "Invalid period. Must be monthly or yearly." },
-        { status: 400 },
-      );
-    }
-
-    const priceId = getCrmPriceId(plan as CrmPlanSlug, period as "monthly" | "yearly");
+    const priceId = getCrmPriceId(plan, period);
     if (!priceId) {
       return NextResponse.json(
         { error: "Price not configured for this plan." },

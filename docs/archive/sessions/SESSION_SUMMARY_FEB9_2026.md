@@ -121,7 +121,7 @@ Comprehensive audit and migration of all 20 external service integrations. Every
 | Service | What Changed | New Secrets | Notes |
 |---------|-------------|-------------|-------|
 | **Rollbar** | Migrated to new FundRoom Rollbar account | `ROLLBAR_READ_TOKEN`, `ROLLBAR_SERVER_TOKEN`, `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN` | All 3 tokens replaced |
-| **Tinybird** | Connected to `fundroomia_workspace` (US West 2) | `TINYBIRD_TOKEN` | New empty workspace; datasources auto-created on first event |
+| **PostHog** | Connected to PostHog project (US region) | `POSTHOG_SERVER_KEY` | Server-side analytics; events auto-created on first publish |
 | **Google OAuth** | Migrated to FundRoom AI Google Cloud project | `FUNDROOM_GOOGLE_CLIENT_ID`, `FUNDROOM_GOOGLE_CLIENT_SECRET` | BFG credentials kept as fallback |
 | **Persona KYC** | Full setup: API + webhook + template | `PERSONA_API_KEY`, `PERSONA_FUNDROOM_KYC_HOOK`, `PERSONA_TEMPLATE_ID` | Template: KYC GovID + Selfie (`itmpl_*`) |
 | **Stripe** | Webhook configured (BFG account, temporary) | `STRIPE_BFG_WEBHOOK_SECRET` | 5 events configured; code supports future `STRIPE_WEBHOOK_SECRET` |
@@ -400,7 +400,7 @@ Critical production environment fix: 15+ environment variables were missing or m
 | `STRIPE_BFG_WEBHOOK_SECRET` | Added (missing) | Stripe webhook secret (secret) |
 | `PERSONA_TEMPLATE_ID` | Added (missing) | Persona KYC template ID (secret) |
 | `PERSONA_WEBHOOK_SECRET` | Added (missing) | Persona webhook secret (secret) — Replit secret name is `PERSONA_FUNDROOM_KYC_HOOK` |
-| `TINYBIRD_TOKEN` | Added (missing) | Tinybird analytics token (secret) |
+| `POSTHOG_SERVER_KEY` | Added (missing) | PostHog server-side analytics key (secret) |
 | `ROLLBAR_SERVER_TOKEN` | Recreated (wrong name) | Rollbar server token (secret) |
 | `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN` | Recreated (wrong name) | Rollbar client token (secret) |
 | `ROLLBAR_READ_TOKEN` | Recreated (wrong name) | Rollbar read token (secret) |

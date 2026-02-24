@@ -16,6 +16,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundingRoundCreateSchema } from "@/lib/validations/fund";
 
 export const dynamic = "force-dynamic";
 
@@ -25,15 +27,6 @@ type Params = {
 
 const VALID_ROLES: Role[] = ["ADMIN", "OWNER", "SUPER_ADMIN", "MANAGER"];
 
-const VALID_ROUND_STATUSES = ["COMPLETED", "ACTIVE", "PLANNED"];
-
-const VALID_INSTRUMENT_TYPES = [
-  "SAFE",
-  "Convertible Note",
-  "Priced Round",
-  "CONVERTIBLE_NOTE",
-  "PRICED_ROUND",
-];
 
 async function authorizeGP(teamId: string) {
   const session = await getServerSession(authOptions);
@@ -155,49 +148,27 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Fund not found" }, { status: 404 });
     }
 
-    const body = await req.json();
-
-    // Validate required fields
-    const { roundName, status, isExternal } = body;
-
-    if (!roundName || typeof roundName !== "string" || roundName.trim().length === 0) {
-      return NextResponse.json(
-        { error: "Round name is required" },
-        { status: 400 },
-      );
-    }
-
-    if (roundName.trim().length > 100) {
-      return NextResponse.json(
-        { error: "Round name must be under 100 characters" },
-        { status: 400 },
-      );
-    }
-
-    if (status && !VALID_ROUND_STATUSES.includes(status)) {
-      return NextResponse.json(
-        { error: `Invalid status. Must be one of: ${VALID_ROUND_STATUSES.join(", ")}` },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, FundingRoundCreateSchema);
+    if (parsed.error) return parsed.error;
+    const data = parsed.data;
 
     // Check for duplicate round names within the same fund
     const existing = await prisma.fundingRound.findFirst({
       where: {
         fundId,
-        roundName: roundName.trim(),
+        roundName: data.roundName.trim(),
       },
     });
 
     if (existing) {
       return NextResponse.json(
-        { error: `A round named "${roundName.trim()}" already exists for this fund` },
+        { error: `A round named "${data.roundName.trim()}" already exists for this fund` },
         { status: 409 },
       );
     }
 
     // Only one ACTIVE round allowed
-    if (status === "ACTIVE") {
+    if (data.status === "ACTIVE") {
       const activeRound = await prisma.fundingRound.findFirst({
         where: { fundId, status: "ACTIVE" },
       });
@@ -209,79 +180,34 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
-    // Parse numeric fields
-    const parseDecimal = (val: unknown): number | null => {
-      if (val === undefined || val === null || val === "") return null;
-      const n = typeof val === "string" ? parseFloat(val.replace(/[^0-9.-]/g, "")) : Number(val);
-      return isNaN(n) ? null : n;
-    };
-
-    const amountRaised = parseDecimal(body.amountRaised) || 0;
-    const targetAmount = parseDecimal(body.targetAmount);
-    const preMoneyVal = parseDecimal(body.preMoneyVal);
-    const postMoneyVal = parseDecimal(body.postMoneyVal);
-    const investorCount = parseInt(body.investorCount) || 0;
-    const valuationCap = parseDecimal(body.valuationCap);
-    const discount = parseDecimal(body.discount);
-
-    // Bounds validation
-    if (amountRaised < 0 || amountRaised > 100_000_000_000) {
-      return NextResponse.json(
-        { error: "Amount raised must be between $0 and $100B" },
-        { status: 400 },
-      );
-    }
-
-    if (targetAmount !== null && (targetAmount < 0 || targetAmount > 100_000_000_000)) {
-      return NextResponse.json(
-        { error: "Target amount must be between $0 and $100B" },
-        { status: 400 },
-      );
-    }
-
-    if (discount !== null && (discount < 0 || discount > 100)) {
-      return NextResponse.json(
-        { error: "Discount must be between 0% and 100%" },
-        { status: 400 },
-      );
-    }
-
-    if (body.instrumentType && !VALID_INSTRUMENT_TYPES.includes(body.instrumentType)) {
-      return NextResponse.json(
-        { error: `Invalid instrument type` },
-        { status: 400 },
-      );
-    }
-
     // Auto-calculate roundOrder: next available order number
     const lastRound = await prisma.fundingRound.findFirst({
       where: { fundId },
       orderBy: { roundOrder: "desc" },
       select: { roundOrder: true },
     });
-    const roundOrder = body.roundOrder
-      ? parseInt(body.roundOrder)
-      : (lastRound?.roundOrder ?? 0) + 1;
+    const roundOrder = data.roundOrder
+      ?? (lastRound?.roundOrder ?? 0) + 1;
 
     const round = await prisma.fundingRound.create({
       data: {
         fundId,
-        roundName: roundName.trim(),
+        roundName: data.roundName.trim(),
         roundOrder,
-        amountRaised,
-        targetAmount,
-        preMoneyVal,
-        postMoneyVal,
-        leadInvestor: body.leadInvestor?.trim() || null,
-        investorCount,
-        roundDate: body.roundDate ? new Date(body.roundDate) : null,
-        closeDate: body.closeDate ? new Date(body.closeDate) : null,
-        status: status || "PLANNED",
-        isExternal: isExternal === true,
-        externalNotes: body.externalNotes?.trim() || null,
-        instrumentType: body.instrumentType || null,
-        valuationCap,
-        discount,
+        amountRaised: data.amountRaised != null ? Number(data.amountRaised) : 0,
+        targetAmount: data.targetAmount != null ? Number(data.targetAmount) : null,
+        preMoneyVal: data.preMoneyVal != null ? Number(data.preMoneyVal) : null,
+        postMoneyVal: data.postMoneyVal != null ? Number(data.postMoneyVal) : null,
+        leadInvestor: data.leadInvestor?.trim() || null,
+        investorCount: data.investorCount ?? 0,
+        roundDate: data.roundDate ? new Date(data.roundDate) : null,
+        closeDate: data.closeDate ? new Date(data.closeDate) : null,
+        status: data.status,
+        isExternal: data.isExternal === true,
+        externalNotes: data.externalNotes?.trim() || null,
+        instrumentType: data.instrumentType || null,
+        valuationCap: data.valuationCap != null ? Number(data.valuationCap) : null,
+        discount: data.discount != null ? Number(data.discount) : null,
         orgId: auth.orgId || "",
       },
     });
@@ -299,7 +225,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         roundName: round.roundName,
         status: round.status,
         isExternal: round.isExternal,
-        amountRaised: amountRaised.toString(),
+        amountRaised: (data.amountRaised ?? 0).toString(),
       },
     }).catch((e) => reportError(e as Error));
 

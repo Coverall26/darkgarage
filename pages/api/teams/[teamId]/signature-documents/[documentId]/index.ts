@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { getFile } from "@/lib/files/get-file";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { SignatureDocumentUpdateSchema } from "@/lib/validations/teams";
 
 export default async function handler(
   req: NextApiRequest,
@@ -22,7 +24,7 @@ export default async function handler(
   const userTeam = await prisma.userTeam.findFirst({
     where: {
       teamId,
-      userId: (session.user as any).id,
+      userId: session.user.id,
     },
   });
 
@@ -94,6 +96,10 @@ async function handlePut(
   documentId: string
 ) {
   try {
+    const parsed = validateBodyPagesRouter(req.body, SignatureDocumentUpdateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
     const {
       title,
       description,
@@ -102,7 +108,7 @@ async function handlePut(
       status,
       expirationDate,
       voidedReason,
-    } = req.body;
+    } = parsed.data;
 
     const existingDoc = await prisma.signatureDocument.findFirst({
       where: { id: documentId, teamId },
@@ -112,7 +118,7 @@ async function handlePut(
       return res.status(404).json({ error: "Document not found" });
     }
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (emailSubject !== undefined) updateData.emailSubject = emailSubject;

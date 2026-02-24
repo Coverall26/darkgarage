@@ -3,8 +3,10 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { authOptions } from "@/lib/auth/auth-options";
 import { getServerSession } from "next-auth/next";
 
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
+import { DocumentMoveSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -19,10 +21,13 @@ export default async function handle(
     }
     const userId = (session.user as CustomUser).id;
     const { teamId } = req.query as { teamId: string };
-    const { documentIds, folderId } = req.body as {
-      documentIds: string[];
-      folderId: string | null;
-    };
+    const parsed = validateBodyPagesRouter(req.body, DocumentMoveSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { documentIds, folderId } = parsed.data;
 
     // Ensure the user is an admin of the team
     const team = await prisma.team.findUnique({

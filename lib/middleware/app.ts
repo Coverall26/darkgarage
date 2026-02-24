@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 import { SESSION_COOKIE_NAME } from "@/lib/constants/auth-cookies";
+import { isAuthDebugEnabled } from "@/lib/feature-flags";
 
-const AUTH_DEBUG = process.env.AUTH_DEBUG === "true";
+const AUTH_DEBUG = isAuthDebugEnabled();
 
 function debugLog(requestId: string, ...args: unknown[]) {
   if (AUTH_DEBUG) {
@@ -52,7 +53,7 @@ export default async function AppMiddleware(req: NextRequest) {
 
   const userEmail = token?.email;
   const userRole = (token?.role as string) || "LP";
-  const userCreatedAt = (token as any)?.createdAt as string | undefined;
+  const userCreatedAt = (token as Record<string, unknown>)?.createdAt as string | undefined;
 
   debugLog(requestId, "Token check:", {
     hasToken: !!token,

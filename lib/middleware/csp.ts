@@ -48,7 +48,6 @@ const trustedConnectDomains = [
   "https://fundroom.ai",
   "https://api.stripe.com",
   "https://*.persona.com",
-  "https://api.tinybird.co",
   "https://*.cal.com",
   "https://cal.com",
   "https://*.public.blob.vercel-storage.com",

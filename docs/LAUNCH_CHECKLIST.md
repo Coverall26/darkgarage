@@ -17,7 +17,7 @@
 - [ ] `FUNDROOM_GOOGLE_CLIENT_ID/SECRET` — redirect URIs include all production domains
 - [ ] `ROLLBAR_SERVER_TOKEN` and `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN` — both set
 - [ ] `UPSTASH_REDIS_REST_URL/TOKEN` — production Redis for rate limiting
-- [ ] `TINYBIRD_TOKEN` — production workspace for server analytics
+- [ ] `POSTHOG_SERVER_KEY` — production key for server analytics
 
 ---
 
@@ -114,7 +114,7 @@
 - [ ] All 4 services up: database, redis, storage, email
 - [ ] Deployment readiness passes: `GET /api/admin/deployment-readiness`
 - [ ] Rollbar receiving errors (test with deliberate error)
-- [ ] Tinybird receiving funnel events (check funnel_events datasource)
+- [ ] PostHog receiving funnel events (check Events tab in PostHog dashboard)
 - [ ] External uptime monitor configured (BetterUptime/Pingdom/UptimeRobot)
   - URL: `https://app.fundroom.ai/api/health`
   - Method: GET
@@ -131,8 +131,8 @@
 
 - [ ] Bermuda seed data loaded (`npx ts-node prisma/seed-bermuda.ts`)
 - [ ] Platform admin created (`rciesco@fundroom.ai`)
-- [ ] Demo LP accounts created (`demo-investor@example.com / Investor2026!`)
-- [ ] Demo GP account works (`joe@bermudafranchisegroup.com / FundRoom2026!`)
+- [ ] Demo LP accounts created (see `LP_SEED_PASSWORD` env var for password)
+- [ ] Demo GP account works (see `GP_SEED_PASSWORD` env var for password)
 - [ ] FundroomActivation record exists (ACTIVE) for Bermuda team
 - [ ] PlatformSettings record exists (`paywallEnforced: false`)
 
@@ -161,7 +161,7 @@
 - [ ] Complete LP onboarding as a test investor
 - [ ] Verify wire proof upload → GP confirmation → LP funded flow
 - [ ] Check Rollbar for any new errors
-- [ ] Check Tinybird for funnel events firing
+- [ ] Check PostHog for funnel events firing
 - [ ] Verify email delivery (signup verification, investor welcome)
 - [ ] Monitor health endpoint for first 24 hours
 

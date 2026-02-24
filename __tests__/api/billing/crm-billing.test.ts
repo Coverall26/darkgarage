@@ -79,6 +79,8 @@ jest.mock("@/lib/tracking/server-events", () => ({
 
 jest.mock("@/lib/security/rate-limiter", () => ({
   appRouterRateLimit: jest.fn().mockResolvedValue(null),
+  appRouterStrictRateLimit: jest.fn().mockResolvedValue(null),
+  appRouterAuthRateLimit: jest.fn().mockResolvedValue(null),
 }));
 
 let _mockSessionValue: unknown = null;

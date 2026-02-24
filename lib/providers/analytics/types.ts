@@ -1,4 +1,4 @@
-export type AnalyticsProviderType = "tinybird" | "posthog" | "mixpanel" | "amplitude";
+export type AnalyticsProviderType = "posthog" | "mixpanel" | "amplitude";
 
 export interface AnalyticsEvent {
   name: string;
@@ -39,5 +39,4 @@ export interface AnalyticsProviderConfig {
   provider: AnalyticsProviderType;
   apiKey?: string;
   host?: string;
-  datasource?: string;
 }

@@ -15,13 +15,13 @@ export default async function handle(
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const userId = (session.user as any).id;
+  const userId = session.user.id;
 
   if (req.method === "GET") {
     try {
       const { unreadOnly, limit = "50", offset = "0" } = req.query;
 
-      const whereClause: any = { userId };
+      const whereClause: Record<string, unknown> = { userId };
       if (unreadOnly === "true") {
         whereClause.read = false;
       }

@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { CapitalCallCreateSchema } from "@/lib/validations/admin";
 import type { Role } from "@prisma/client";
 
 /**
@@ -118,42 +120,11 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { callNumber, amount, purpose, dueDate, proRataPercentage } = body;
-
-    // Validation
-    if (!amount || amount <= 0 || amount > 100_000_000_000) {
-      return NextResponse.json(
-        { error: "Amount must be between 0 and $100B" },
-        { status: 400 },
-      );
-    }
-
-    if (!dueDate) {
-      return NextResponse.json(
-        { error: "Due date is required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, CapitalCallCreateSchema);
+    if (parsed.error) return parsed.error;
+    const { callNumber, amount, purpose, dueDate, proRataPercentage, notes } = parsed.data;
 
     const parsedDueDate = new Date(dueDate);
-    if (isNaN(parsedDueDate.getTime())) {
-      return NextResponse.json(
-        { error: "Invalid due date" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      proRataPercentage !== undefined &&
-      proRataPercentage !== null &&
-      (proRataPercentage <= 0 || proRataPercentage > 100)
-    ) {
-      return NextResponse.json(
-        { error: "Pro-rata percentage must be between 0 and 100" },
-        { status: 400 },
-      );
-    }
 
     // Auto-suggest call number if not provided
     let finalCallNumber = callNumber;

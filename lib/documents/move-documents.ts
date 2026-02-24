@@ -23,16 +23,16 @@ export const moveDocumentToFolder = async ({
   // Optimistically update the UI by removing the documents from current folder
   mutate(
     key,
-    (data: any) => {
-      if (Array.isArray(data?.documents)) {
+    (data: { documents?: Array<{ id: string }> } | Array<{ id: string }> | undefined) => {
+      if (data && !Array.isArray(data) && Array.isArray(data.documents)) {
         const updatedDocuments = data.documents.filter(
-          (doc: any) => !documentIds.includes(doc.id),
+          (doc: { id: string }) => !documentIds.includes(doc.id),
         );
         return { ...data, documents: updatedDocuments };
       }
       if (Array.isArray(data)) {
         const updatedDocuments = data.filter(
-          (doc: any) => !documentIds.includes(doc.id),
+          (doc: { id: string }) => !documentIds.includes(doc.id),
         );
         return updatedDocuments;
       }
@@ -45,7 +45,7 @@ export const moveDocumentToFolder = async ({
   if (folderIds) {
     mutate(
       folderKey,
-      (folder: any) => {
+      (folder: Array<{ id: string }> | undefined) => {
         if (Array.isArray(folder)) {
           interface Folder {
             id: string;

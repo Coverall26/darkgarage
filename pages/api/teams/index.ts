@@ -3,10 +3,12 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
 
 import { errorhandler } from "@/lib/errorHandler";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { publishServerEvent } from "@/lib/tracking/server-events";
 import { CustomUser } from "@/lib/types";
 import { log } from "@/lib/utils";
+import { TeamCreateBodySchema } from "@/lib/validations/teams";
 
 import { authOptions } from "@/lib/auth/auth-options";
 
@@ -97,7 +99,7 @@ export default async function handle(
             },
           });
 
-          // Fire-and-forget server-side funnel event to Tinybird
+          // Fire-and-forget server-side funnel event to PostHog
           publishServerEvent("funnel_team_created", {
             teamId: defaultTeam.id,
             orgId: "",
@@ -124,7 +126,11 @@ export default async function handle(
       return res.status(401).end("Unauthorized");
     }
 
-    const { team } = req.body;
+    const parsed = validateBodyPagesRouter(req.body, TeamCreateBodySchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { team } = parsed.data;
 
     const user = session.user as CustomUser;
 
@@ -144,7 +150,7 @@ export default async function handle(
         },
       });
 
-      // Fire-and-forget server-side funnel event to Tinybird
+      // Fire-and-forget server-side funnel event to PostHog
       publishServerEvent("funnel_team_created", {
         teamId: newTeam.id,
         orgId: "",

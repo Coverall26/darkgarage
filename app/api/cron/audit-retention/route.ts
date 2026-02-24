@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { receiver } from "@/lib/cron";
 import { log } from "@/lib/utils";
 import { reportError } from "@/lib/error";
+import { requireCronAuth } from "@/lib/middleware/cron-auth";
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -24,6 +25,10 @@ export async function POST(req: Request) {
     if (!isValid) {
       return new Response("Unauthorized", { status: 401 });
     }
+  } else {
+    // Defense-in-depth: verify CRON_SECRET in non-Vercel environments
+    const cronAuth = requireCronAuth(req);
+    if (cronAuth) return cronAuth;
   }
 
   try {

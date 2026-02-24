@@ -6,6 +6,8 @@ import { createAdminMagicLink } from "@/lib/auth/admin-magic-link";
 import { sendEmail, isResendConfigured } from "@/lib/resend";
 import AdminLoginLinkEmail from "@/components/emails/admin-login-link";
 import { appRouterAuthRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { AdminLoginSchema } from "@/lib/validations/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +20,9 @@ export async function POST(req: NextRequest) {
   const blocked = await appRouterAuthRateLimit(req);
   if (blocked) return blocked;
 
-  const body = await req.json();
-  const { email, redirectPath } = body;
-
-  if (!email || typeof email !== "string") {
-    return NextResponse.json({ error: "Email is required" }, { status: 400 });
-  }
-
-  const emailLower = email.toLowerCase().trim();
+  const parsed = await validateBody(req, AdminLoginSchema);
+  if (parsed.error) return parsed.error;
+  const { email: emailLower, redirectPath } = parsed.data;
 
   // Check if user is an admin (static list + database lookup)
   const isAdmin = await isUserAdminAsync(emailLower);

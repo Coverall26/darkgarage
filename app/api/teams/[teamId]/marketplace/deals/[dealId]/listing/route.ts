@@ -7,6 +7,9 @@ import {
 } from "@/lib/marketplace";
 import { verifyNotBot } from "@/lib/security/bot-protection";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { DealListingSchema } from "@/lib/validations/esign-outreach";
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +30,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, DealListingSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
-    if (!body.headline || !body.summary) {
+    if (!body.title || !body.description) {
       return NextResponse.json(
-        { error: "headline and summary are required" },
+        { error: "title and description are required" },
         { status: 400 },
       );
     }
@@ -39,12 +44,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     const listing = await upsertListing(
       {
         dealId,
-        headline: body.headline,
-        summary: body.summary,
-        highlights: body.highlights,
+        headline: body.title,
+        summary: body.description,
+        highlights: undefined,
         category: body.category,
-        coverImageUrl: body.coverImageUrl,
-        searchTags: body.searchTags,
+        coverImageUrl: undefined,
+        searchTags: body.tags,
       },
       teamId,
     );
@@ -66,22 +71,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const botCheck = await verifyNotBot();
     if (botCheck.blocked) return botCheck.response;
 
-    const { teamId } = await params;
+    const { teamId, dealId } = await params;
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, DealListingSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
-    if (!body.listingId) {
+    // Look up the listing by dealId (unique constraint)
+    const existingListing = await prisma.marketplaceListing.findUnique({
+      where: { dealId },
+      select: { id: true },
+    });
+
+    if (!existingListing) {
       return NextResponse.json(
-        { error: "listingId is required" },
-        { status: 400 },
+        { error: "No listing found for this deal" },
+        { status: 404 },
       );
     }
 
-    const listing = body.publish
-      ? await publishListing(body.listingId)
-      : await unpublishListing(body.listingId);
+    const listing = body.isPublic
+      ? await publishListing(existingListing.id)
+      : await unpublishListing(existingListing.id);
 
     return NextResponse.json({ success: true, listing });
   } catch (error: unknown) {

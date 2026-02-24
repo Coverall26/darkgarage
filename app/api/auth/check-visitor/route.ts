@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma";
 import { isAdminEmail } from "@/lib/constants/admins";
 import { reportError } from "@/lib/error";
 import { appRouterAuthRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { CheckVisitorSchema } from "@/lib/validations/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +18,9 @@ export async function POST(req: NextRequest) {
   const blocked = await appRouterAuthRateLimit(req);
   if (blocked) return blocked;
 
-  const body = await req.json();
-  const { email } = body;
-
-  if (!email || typeof email !== "string") {
-    return NextResponse.json({ error: "Email is required" }, { status: 400 });
-  }
-
-  const emailLower = email.toLowerCase().trim();
+  const parsed = await validateBody(req, CheckVisitorSchema);
+  if (parsed.error) return parsed.error;
+  const emailLower = parsed.data.email;
 
   try {
     // Check static list first

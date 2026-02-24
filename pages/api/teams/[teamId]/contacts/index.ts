@@ -10,9 +10,11 @@ import {
 } from "@/lib/crm";
 import { logContactActivity } from "@/lib/crm/contact-service";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { apiRateLimiter } from "@/lib/security/rate-limiter";
 import { CustomUser } from "@/lib/types";
+import { ContactCreateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -109,28 +111,28 @@ async function handleCreate(
   userId: string,
 ) {
   try {
-    const { email, firstName, lastName, phone, company, title, status, source, investorId, assignedToId, tags, customFields, referralSource, notes } = req.body;
-
-    if (!email || typeof email !== "string" || !email.includes("@")) {
-      return res.status(400).json({ error: "Valid email is required" });
+    const parsed = validateBodyPagesRouter(req.body, ContactCreateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
     }
+    const { email, firstName, lastName, phone, company, title, status, source, investorId, assignedToId, tags, customFields, referralSource, notes } = parsed.data;
 
     const input: ContactCreateInput = {
       teamId,
       email,
-      firstName,
-      lastName,
-      phone,
-      company,
-      title,
-      status,
-      source,
-      investorId,
-      assignedToId,
-      tags,
-      customFields,
-      referralSource,
-      notes,
+      firstName: firstName ?? undefined,
+      lastName: lastName ?? undefined,
+      phone: phone ?? undefined,
+      company: company ?? undefined,
+      title: title ?? undefined,
+      status: (status ?? undefined) as ContactCreateInput["status"],
+      source: (source ?? undefined) as ContactCreateInput["source"],
+      investorId: investorId ?? undefined,
+      assignedToId: assignedToId ?? undefined,
+      tags: tags ?? undefined,
+      customFields: (customFields ?? undefined) as ContactCreateInput["customFields"],
+      referralSource: referralSource ?? undefined,
+      notes: notes ?? undefined,
     };
 
     const contact = await createContact(input);

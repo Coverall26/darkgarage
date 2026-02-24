@@ -667,8 +667,6 @@ export default function LinkSheet({
                           <Select
                             onValueChange={(value) => {
                               if (value === "add_group") {
-                                // Open the group sheet
-                                console.log("add_group redirect");
                                 return;
                               }
 

@@ -5,15 +5,19 @@
  * (contacts, e-signatures, email templates).
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAuthAppRouter } from "@/lib/auth/rbac";
+import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import prisma from "@/lib/prisma";
 import { resolveOrgTier } from "@/lib/tier/crm-tier";
 import { reportError } from "@/lib/error";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   const auth = await requireAuthAppRouter();
   if (auth instanceof NextResponse) return auth;
 

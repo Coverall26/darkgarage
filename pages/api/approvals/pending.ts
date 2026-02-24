@@ -134,6 +134,8 @@ export default async function handler(
         entityType: investor.entityType,
         commitmentAmount: investment.commitmentAmount ? Number(investment.commitmentAmount) : undefined,
         accreditationStatus: investor.accreditationStatus,
+        accreditationMethod: (investor as Record<string, unknown>).accreditationMethod || null,
+        accreditationDocumentIds: (investor as Record<string, unknown>).accreditationDocumentIds || [],
         fields: [
           { name: "entityName", label: "Legal Name", value: investor.entityName || "", editable: true },
           { name: "entityType", label: "Entity Type", value: investor.entityType || "INDIVIDUAL", editable: true },

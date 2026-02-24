@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { CapitalCallUpdateSchema } from "@/lib/validations/admin";
 
 /**
  * GET /api/teams/[teamId]/funds/[fundId]/capital-calls/[callId]
@@ -179,31 +181,22 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
+    const parsed = await validateBody(req, CapitalCallUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
+
     const updateData: Record<string, unknown> = {};
 
     if (body.amount !== undefined) {
-      if (body.amount <= 0 || body.amount > 100_000_000_000) {
-        return NextResponse.json(
-          { error: "Amount must be between 0 and $100B" },
-          { status: 400 },
-        );
-      }
       updateData.amount = body.amount;
     }
 
     if (body.purpose !== undefined) updateData.purpose = body.purpose;
     if (body.dueDate !== undefined) {
-      const parsed = new Date(body.dueDate);
-      if (isNaN(parsed.getTime())) {
-        return NextResponse.json(
-          { error: "Invalid due date" },
-          { status: 400 },
-        );
-      }
-      updateData.dueDate = parsed;
+      updateData.dueDate = new Date(body.dueDate);
     }
     if (body.notes !== undefined) updateData.notes = body.notes;
+    if (body.status !== undefined) updateData.status = body.status;
 
     const updated = await prisma.capitalCall.update({
       where: { id: callId },

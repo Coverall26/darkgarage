@@ -17,28 +17,24 @@ import { reportError } from "@/lib/error";
 import { stripeInstance } from "@/ee/stripe";
 import { AI_CRM_ADDON } from "@/lib/stripe/crm-products";
 import { invalidateTierCache } from "@/lib/tier/crm-tier";
-import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { validateBody } from "@/lib/middleware/validate";
+import { AiAddonSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const blocked = await appRouterRateLimit(req);
+  const blocked = await appRouterStrictRateLimit(req);
   if (blocked) return blocked;
 
   try {
     const auth = await requireAuthAppRouter();
     if (auth instanceof NextResponse) return auth;
 
-    const body = await req.json();
-    const { action, period } = body as { action: string; period?: string };
-
-    if (!action || !["subscribe", "cancel"].includes(action)) {
-      return NextResponse.json(
-        { error: "Invalid action. Must be 'subscribe' or 'cancel'." },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, AiAddonSchema);
+    if (parsed.error) return parsed.error;
+    const { action, period } = parsed.data;
 
     // Resolve user's org
     const user = await prisma.user.findUnique({

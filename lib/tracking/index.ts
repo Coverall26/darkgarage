@@ -71,7 +71,7 @@ export {
   trackUploadFailure,
 } from "./failure-tracker";
 
-// Server-side event publishing (Tinybird)
+// Server-side event publishing (PostHog)
 // NOTE: publishServerEvent is NOT re-exported here because this barrel is
 // imported by client components. Import directly:
 //   import { publishServerEvent } from "@/lib/tracking/server-events";

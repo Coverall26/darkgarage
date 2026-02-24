@@ -66,8 +66,6 @@ export default function ExpirationSection({
 
     const now = new Date();
     if (date <= now) {
-      console.log("date <= now", now, date);
-
       // Always add 1 day (86400000 milliseconds) to current time
       const newDate = new Date(now.getTime() + 86400 * 1000);
 

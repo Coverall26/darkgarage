@@ -3,9 +3,11 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { authOptions } from "@/lib/auth/auth-options";
 import { getServerSession } from "next-auth/next";
 
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { reportError } from "@/lib/error";
+import { DataroomGroupMembersBulkAddSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -30,11 +32,13 @@ export default async function handle(
       groupId: string;
     };
 
-    const { emails, domains, allowAll } = req.body as {
-      emails: string[];
-      domains: string[];
-      allowAll: boolean;
-    };
+    const parsed = validateBodyPagesRouter(req.body, DataroomGroupMembersBulkAddSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { emails, domains, allowAll } = parsed.data;
 
     try {
       // Check if the user is part of the team

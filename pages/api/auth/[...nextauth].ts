@@ -171,7 +171,7 @@ const getAuthOptions = (req: NextApiRequest): NextAuthOptions => {
           }),
         ]);
 
-        // Fire-and-forget server-side funnel event to Tinybird (no PII)
+        // Fire-and-forget server-side funnel event to PostHog (no PII)
         if (message.isNewUser) {
           publishServerEvent("funnel_signup_completed", {
             userId: message.user.id,

@@ -15,7 +15,6 @@ export const sendEmailPauseResumeReminder = async ({
 }) => {
   try {
     if (!teamMemberEmails || teamMemberEmails.length === 0) {
-      console.log("No team member emails provided");
       return;
     }
 

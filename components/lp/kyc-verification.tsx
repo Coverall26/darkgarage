@@ -107,19 +107,16 @@ export function KycVerification({ onStatusChange, compact = false }: KycVerifica
               sessionToken: data.sessionToken,
               
               onReady: () => {
-                console.log("[Persona] Ready");
                 embeddedClientRef.current?.open();
               },
-              
+
               onComplete: async ({ inquiryId, status }: { inquiryId: string; status: string }) => {
-                console.log("[Persona] Complete:", status);
                 toast.success("Identity verification submitted successfully!");
                 setShowEmbedded(false);
                 await fetchStatus();
               },
-              
+
               onCancel: ({ inquiryId }: { inquiryId?: string; sessionToken?: string }) => {
-                console.log("[Persona] Cancelled");
                 setShowEmbedded(false);
               },
               

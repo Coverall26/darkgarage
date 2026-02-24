@@ -67,7 +67,6 @@ export default async function handler(
       return res.status(404).json({ error: "Document not found" });
     }
 
-    // @ts-ignore - Model exists in schema, TS server may need restart
     const auditLogs = await prisma.signatureAuditLog.findMany({
       where: { documentId },
       orderBy: { createdAt: "asc" },

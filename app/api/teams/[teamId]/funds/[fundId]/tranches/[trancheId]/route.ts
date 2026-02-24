@@ -8,6 +8,8 @@ import {
   TRANCHE_STATUSES,
 } from "@/lib/funds/tranches";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { TrancheUpdateSchema } from "@/lib/validations/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -117,9 +119,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = await validateBody(req, TrancheUpdateSchema);
+    if (parsed.error) return parsed.error;
     const { status, fundedAmount, capitalCallId, wireProofDocumentId, notes } =
-      body;
+      parsed.data;
 
     if (status) {
       if (!TRANCHE_STATUSES.includes(status as TrancheStatus)) {
@@ -134,7 +137,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       const result = await transitionTrancheStatus(
         trancheId,
         status as TrancheStatus,
-        { fundedAmount, capitalCallId, wireProofDocumentId, notes },
+        { fundedAmount, capitalCallId: capitalCallId ?? undefined, wireProofDocumentId: wireProofDocumentId ?? undefined, notes: notes ?? undefined },
       );
 
       if (!result.success) {

@@ -1,4 +1,4 @@
-export const createWebhookSignature = async (secret: string, body: any) => {
+export const createWebhookSignature = async (secret: string, body: string | Record<string, unknown>) => {
   if (!secret) {
     throw new Error("A secret must be provided to create a webhook signature.");
   }

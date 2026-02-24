@@ -17,7 +17,6 @@ export const sendConversationTeamNotification = async ({
 }) => {
   try {
     if (!teamMemberEmails || teamMemberEmails.length === 0) {
-      console.log("No team member emails provided");
       return;
     }
 

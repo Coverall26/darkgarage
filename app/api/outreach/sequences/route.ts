@@ -15,6 +15,8 @@ import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { resolveOrgTier } from "@/lib/tier/crm-tier";
 import { resolveCrmRole, hasCrmPermission } from "@/lib/auth/crm-roles";
 import { OutreachStepCondition } from "@prisma/client";
+import { validateBody } from "@/lib/middleware/validate";
+import { SequenceUpdateSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -137,10 +139,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { name, description, steps } = body;
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, SequenceUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const { name, description, steps } = parsed.data;
 
-    if (!name || typeof name !== "string" || !name.trim()) {
+    if (!name || !name.trim()) {
       return NextResponse.json(
         { error: "Sequence name is required" },
         { status: 400 },
@@ -150,13 +154,6 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(steps) || steps.length === 0) {
       return NextResponse.json(
         { error: "At least one step is required" },
-        { status: 400 },
-      );
-    }
-
-    if (steps.length > 10) {
-      return NextResponse.json(
-        { error: "Maximum 10 steps per sequence" },
         { status: 400 },
       );
     }
@@ -203,9 +200,9 @@ export async function POST(req: NextRequest) {
             (
               s: {
                 delayDays?: number;
-                templateId?: string;
-                aiPrompt?: string;
-                condition?: string;
+                templateId?: string | null;
+                aiPrompt?: string | null;
+                condition?: string | null;
               },
               i: number,
             ) => ({

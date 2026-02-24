@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { CapitalCallStatus } from "@prisma/client";
 
 /**
  * GET /api/lp/capital-calls
@@ -54,8 +55,8 @@ export async function GET(req: NextRequest) {
       where: {
         fundId,
         status: statusFilter
-          ? (statusFilter as any)
-          : { not: "DRAFT" as any }, // LPs never see drafts
+          ? (statusFilter as CapitalCallStatus)
+          : { not: "DRAFT" as CapitalCallStatus }, // LPs never see drafts
         // Only return calls where this investor has a response
         responses: {
           some: { investorId: investor.id },

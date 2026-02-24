@@ -12,11 +12,11 @@ import { test as base, expect, type Page } from "@playwright/test";
  *   test("lp dashboard loads", async ({ lpPage }) => { ... });
  */
 
-// Demo credentials from prisma/seed-bermuda.ts
+// Demo credentials — read from env vars, falling back to seed defaults
 const GP_EMAIL = "joe@bermudafranchisegroup.com";
-const GP_PASSWORD = "FundRoom2026!";
+const GP_PASSWORD = process.env.GP_SEED_PASSWORD || "FundRoom2026!";
 const LP_EMAIL = "demo-investor@example.com";
-const LP_PASSWORD = "Investor2026!";
+const LP_PASSWORD = process.env.LP_SEED_PASSWORD || "Investor2026!";
 
 async function loginWithCredentials(
   page: Page,

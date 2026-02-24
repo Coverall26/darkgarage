@@ -12,6 +12,7 @@
  *   if (tier.usage.documents >= tier.limits.documents) return res.status(403).json({ error: "Document limit reached" });
  */
 
+import { isPaywallBypassed } from "@/lib/feature-flags";
 import prisma from "@/lib/prisma";
 
 import {
@@ -384,7 +385,7 @@ export async function resolveTier(teamId: string): Promise<ResolvedTier> {
     (activation?.status as ActivationStatus) ?? "NONE";
   const fundroomActive =
     activationStatus === "ACTIVE" ||
-    process.env.PAYWALL_BYPASS === "true";
+    isPaywallBypassed();
 
   // --- Capabilities ---
   const isPaused = subscriptionStatus === "paused";

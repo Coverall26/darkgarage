@@ -101,7 +101,6 @@ export function ConversationViewSidebar({
 
   // Create a new conversation
   const handleCreateConversation = async (data: CreateConversationData) => {
-    console.log("Creating conversation", data);
     try {
       const response = await fetch("/api/conversations", {
         method: "POST",

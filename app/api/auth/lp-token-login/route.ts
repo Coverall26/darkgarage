@@ -6,6 +6,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterAuthRateLimit } from "@/lib/security/rate-limiter";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { validateBody } from "@/lib/middleware/validate";
+import { LpTokenLoginSchema } from "@/lib/validations/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +21,9 @@ export async function POST(req: NextRequest) {
   const blocked = await appRouterAuthRateLimit(req);
   if (blocked) return blocked;
 
-  const body = await req.json();
-  const { token } = body;
-
-  if (!token || typeof token !== "string") {
-    return NextResponse.json({ error: "Token is required" }, { status: 400 });
-  }
+  const parsed = await validateBody(req, LpTokenLoginSchema);
+  if (parsed.error) return parsed.error;
+  const { token } = parsed.data;
 
   try {
     // Look up the one-time token

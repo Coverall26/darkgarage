@@ -5,7 +5,6 @@ import { getServerSession } from "next-auth/next";
 
 import { errorhandler } from "@/lib/errorHandler";
 import prisma from "@/lib/prisma";
-import { getViewPageDuration } from "@/lib/tinybird";
 import { getViewDurationStatsPg } from "@/lib/tracking/postgres-stats";
 import { CustomUser } from "@/lib/types";
 
@@ -58,20 +57,10 @@ export default async function handle(
         return res.status(404).json({ error: "Document not found" });
       }
 
-      let duration: { data: { pageNumber: string; sum_duration: number }[] };
-      
-      if (process.env.TINYBIRD_TOKEN) {
-        duration = await getViewPageDuration({
-          documentId: docId,
-          viewId: viewId,
-          since: 0,
-        });
-      } else {
-        duration = await getViewDurationStatsPg({
-          documentId: docId,
-          viewId: viewId,
-        });
-      }
+      const duration = await getViewDurationStatsPg({
+        documentId: docId,
+        viewId: viewId,
+      });
 
       const total_duration = duration.data.reduce(
         (totalDuration, data) => totalDuration + data.sum_duration,

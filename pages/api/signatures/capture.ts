@@ -1,10 +1,21 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
+import { z } from "zod";
 
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+
+const SignatureCaptureSchema = z.object({
+  signatureImage: z
+    .string()
+    .min(1, "signatureImage is required")
+    .refine((val) => val.startsWith("data:image/"), "Invalid image format")
+    .refine((val) => val.length <= 500 * 1024, "Signature image too large (max 500KB)"),
+  signatureType: z.enum(["draw", "type", "upload"]).optional(),
+  initialsImage: z.string().nullable().optional(),
+});
 
 /**
  * POST /api/signatures/capture
@@ -25,25 +36,14 @@ export default async function handler(
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { signatureImage, signatureType, initialsImage } = req.body as {
-    signatureImage?: string;
-    signatureType?: "draw" | "type" | "upload";
-    initialsImage?: string;
-  };
-
-  if (!signatureImage) {
-    return res.status(400).json({ error: "signatureImage is required" });
+  const parsed = SignatureCaptureSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message || "Invalid request body",
+    });
   }
 
-  // Validate base64 data URL
-  if (!signatureImage.startsWith("data:image/")) {
-    return res.status(400).json({ error: "Invalid image format" });
-  }
-
-  // Size check (< 500KB base64)
-  if (signatureImage.length > 500 * 1024) {
-    return res.status(400).json({ error: "Signature image too large (max 500KB)" });
-  }
+  const { signatureImage, signatureType, initialsImage } = parsed.data;
 
   try {
     // Find or create investor profile

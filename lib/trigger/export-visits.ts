@@ -1,14 +1,9 @@
 import { logger, task } from "@/lib/jobs";
-import Bottleneck from "bottleneck";
 
 import { sendExportReadyEmail } from "@/lib/emails/send-export-ready-email";
 import prisma from "@/lib/prisma";
 import { jobStore } from "@/lib/redis-job-store";
-import {
-  getViewPageDuration,
-  getViewUserAgent,
-  getViewUserAgent_v2,
-} from "@/lib/tinybird";
+import { getViewDurationStatsPg } from "@/lib/tracking/postgres-stats";
 
 // Helper function to properly escape CSV fields
 function escapeCsvField(field: string | number | null | undefined): string {
@@ -35,12 +30,6 @@ function escapeCsvField(field: string | number | null | undefined): string {
 function createCsvRow(fields: (string | number | null | undefined)[]): string {
   return fields.map(escapeCsvField).join(",");
 }
-
-// Create a bottleneck instance to limit tinybird API calls
-const tinybirdLimiter = new Bottleneck({
-  maxConcurrent: 5, // Maximum 5 concurrent requests
-  minTime: 200, // Minimum 200ms between requests
-});
 
 export type ExportVisitsPayload = {
   type: "document" | "dataroom" | "dataroom-group";
@@ -262,31 +251,27 @@ async function exportDocumentVisits(
       viewedAt: view.viewedAt,
     });
 
-    // Rate-limited calls to tinybird
-    const [duration, userAgentData] = await Promise.all([
-      tinybirdLimiter.schedule(() =>
-        getViewPageDuration({
-          documentId: docId,
-          viewId: view.id,
-          since: 0,
-        }),
-      ),
-      tinybirdLimiter.schedule(async () => {
-        const result = await getViewUserAgent({
-          viewId: view.id,
-        });
-
-        if (!result || result.rows === 0) {
-          return getViewUserAgent_v2({
-            documentId: docId,
-            viewId: view.id,
-            since: 0,
-          });
-        }
-
-        return result;
+    // Query PageView for duration and user agent data
+    const [duration, pageViewAgent] = await Promise.all([
+      getViewDurationStatsPg({
+        documentId: docId,
+        viewId: view.id,
+      }),
+      prisma.pageView.findFirst({
+        where: { viewId: view.id },
+        select: {
+          country: true,
+          city: true,
+          browser: true,
+          os: true,
+          device: true,
+        },
       }),
     ]);
+
+    const userAgentData = pageViewAgent
+      ? { data: [pageViewAgent] }
+      : { data: [] as Array<{ country: string | null; city: string | null; browser: string | null; os: string | null; device: string | null }> };
 
     const relevantDocumentVersion = document.versions.find(
       (version) => version.createdAt <= view.viewedAt,
@@ -578,13 +563,10 @@ async function exportDataroomVisits(
         },
       );
 
-      const duration = await tinybirdLimiter.schedule(() =>
-        getViewPageDuration({
-          documentId: docView.document?.id || "null",
-          viewId: docView.id,
-          since: 0,
-        }),
-      );
+      const duration = await getViewDurationStatsPg({
+        documentId: docView.document?.id || "null",
+        viewId: docView.id,
+      });
 
       const relevantVersion = docView.document?.versions.find(
         (version) => version.createdAt <= docView.viewedAt,
@@ -645,24 +627,23 @@ async function exportDataroomVisits(
     dataroomViewMap.set(view.id, view);
   });
 
-  // Get user agent data for all document views at once with rate limiting
+  // Get user agent data for all document views from PageView table
   const userAgentDataMap = new Map();
   for (const docView of documentViews) {
-    const userAgentData = await tinybirdLimiter.schedule(async () => {
-      const result = await getViewUserAgent({
-        viewId: docView.id,
-      });
-
-      if (!result || result.rows === 0) {
-        return getViewUserAgent_v2({
-          documentId: docView.document?.id || "null",
-          viewId: docView.id,
-          since: 0,
-        });
-      }
-
-      return result;
+    const pageViewAgent = await prisma.pageView.findFirst({
+      where: { viewId: docView.id },
+      select: {
+        country: true,
+        city: true,
+        browser: true,
+        os: true,
+        device: true,
+      },
     });
+
+    const userAgentData = pageViewAgent
+      ? { data: [pageViewAgent] }
+      : { data: [] as Array<{ country: string | null; city: string | null; browser: string | null; os: string | null; device: string | null }> };
 
     userAgentDataMap.set(docView.id, userAgentData);
   }

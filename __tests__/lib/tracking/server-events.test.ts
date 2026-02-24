@@ -1,20 +1,21 @@
 /**
  * Tests for server-events module.
  *
- * The module uses @chronark/zod-bird SDK and `import "server-only"`.
+ * The module uses posthog-node SDK and `import "server-only"`.
  * We mock both to test the publishServerEvent function.
  */
 
 // Mock "server-only" (it's a no-op guard that throws at import in client bundles)
 jest.mock("server-only", () => ({}));
 
-// Mock @chronark/zod-bird
-const mockIngest = jest.fn().mockResolvedValue(undefined);
-const mockBuildIngestEndpoint = jest.fn().mockReturnValue(mockIngest);
+// Mock posthog-node
+const mockCapture = jest.fn();
+const mockShutdown = jest.fn().mockResolvedValue(undefined);
 
-jest.mock("@chronark/zod-bird", () => ({
-  Tinybird: jest.fn().mockImplementation(() => ({
-    buildIngestEndpoint: mockBuildIngestEndpoint,
+jest.mock("posthog-node", () => ({
+  PostHog: jest.fn().mockImplementation(() => ({
+    capture: mockCapture,
+    shutdown: mockShutdown,
   })),
 }));
 
@@ -25,8 +26,9 @@ beforeEach(() => {
   jest.resetModules();
   jest.clearAllMocks();
   process.env = { ...originalEnv };
-  delete process.env.TINYBIRD_TOKEN;
-  delete process.env.TINYBIRD_HOST;
+  delete process.env.POSTHOG_SERVER_KEY;
+  delete process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  delete process.env.POSTHOG_HOST;
 });
 
 afterAll(() => {
@@ -35,7 +37,7 @@ afterAll(() => {
 
 describe("server-events", () => {
   describe("publishServerEvent", () => {
-    it("logs to console when TINYBIRD_TOKEN is not set", async () => {
+    it("logs to console when PostHog key is not set", async () => {
       const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
       const { publishServerEvent } = await import("@/lib/tracking/server-events");
@@ -44,79 +46,99 @@ describe("server-events", () => {
       expect(consoleSpy).toHaveBeenCalledWith(
         "[FUNNEL] funnel_signup_completed",
         expect.objectContaining({
-          event_name: "funnel_signup_completed",
           userId: "u1",
-          timestamp: expect.any(String),
         }),
       );
-      expect(mockIngest).not.toHaveBeenCalled();
+      expect(mockCapture).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });
 
-    it("publishes to Tinybird via zod-bird when TINYBIRD_TOKEN is set", async () => {
-      process.env.TINYBIRD_TOKEN = "test-token-123";
+    it("publishes to PostHog when POSTHOG_SERVER_KEY is set", async () => {
+      process.env.POSTHOG_SERVER_KEY = "phx_test-key-123";
 
       const { publishServerEvent } = await import("@/lib/tracking/server-events");
-      await publishServerEvent("funnel_org_created", { orgId: "org-1" });
+      await publishServerEvent("funnel_org_created", { orgId: "org-1", userId: "u1" });
 
-      expect(mockIngest).toHaveBeenCalledTimes(1);
-      expect(mockIngest).toHaveBeenCalledWith(
+      expect(mockCapture).toHaveBeenCalledTimes(1);
+      expect(mockCapture).toHaveBeenCalledWith(
         expect.objectContaining({
-          event_name: "funnel_org_created",
-          orgId: "org-1",
-          timestamp: expect.any(String),
+          distinctId: "u1",
+          event: "funnel_org_created",
+          properties: expect.objectContaining({
+            orgId: "org-1",
+            userId: "u1",
+            $lib: "posthog-node",
+            source: "server",
+          }),
         }),
       );
     });
 
-    it("creates Tinybird client with correct config", async () => {
-      process.env.TINYBIRD_TOKEN = "test-token";
-      process.env.TINYBIRD_HOST = "https://custom.tinybird.co";
+    it("falls back to NEXT_PUBLIC_POSTHOG_KEY when server key not set", async () => {
+      process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_public-key";
 
-      const { Tinybird } = await import("@chronark/zod-bird");
+      const { PostHog } = await import("posthog-node");
+      const { publishServerEvent } = await import("@/lib/tracking/server-events");
+      await publishServerEvent("test_event", { userId: "u1" });
+
+      expect(PostHog).toHaveBeenCalledWith("phc_public-key", expect.any(Object));
+      expect(mockCapture).toHaveBeenCalledTimes(1);
+    });
+
+    it("creates PostHog client with custom host when POSTHOG_HOST is set", async () => {
+      process.env.POSTHOG_SERVER_KEY = "phx_test-key";
+      process.env.POSTHOG_HOST = "https://custom.posthog.example.com";
+
+      const { PostHog } = await import("posthog-node");
       const { publishServerEvent } = await import("@/lib/tracking/server-events");
       await publishServerEvent("test_event");
 
-      expect(Tinybird).toHaveBeenCalledWith({
-        token: "test-token",
-        baseUrl: "https://custom.tinybird.co",
+      expect(PostHog).toHaveBeenCalledWith("phx_test-key", {
+        host: "https://custom.posthog.example.com",
+        flushAt: 10,
+        flushInterval: 5000,
       });
     });
 
-    it("uses default US West 2 host when TINYBIRD_HOST is not set", async () => {
-      process.env.TINYBIRD_TOKEN = "test-token";
+    it("uses default US host when POSTHOG_HOST is not set", async () => {
+      process.env.POSTHOG_SERVER_KEY = "phx_test-key";
 
-      const { Tinybird } = await import("@chronark/zod-bird");
+      const { PostHog } = await import("posthog-node");
       const { publishServerEvent } = await import("@/lib/tracking/server-events");
       await publishServerEvent("test_event");
 
-      expect(Tinybird).toHaveBeenCalledWith({
-        token: "test-token",
-        baseUrl: "https://api.us-west-2.aws.tinybird.co",
+      expect(PostHog).toHaveBeenCalledWith("phx_test-key", {
+        host: "https://us.i.posthog.com",
+        flushAt: 10,
+        flushInterval: 5000,
       });
     });
 
-    it("logs warning when zod-bird ingest throws", async () => {
-      process.env.TINYBIRD_TOKEN = "test-token";
+    it("logs warning when PostHog capture throws", async () => {
+      process.env.POSTHOG_SERVER_KEY = "phx_test-key";
       const warnSpy = jest.spyOn(console, "warn").mockImplementation();
-      mockIngest.mockRejectedValueOnce(new Error("Network error"));
+      mockCapture.mockImplementationOnce(() => {
+        throw new Error("Network error");
+      });
 
       const { publishServerEvent } = await import("@/lib/tracking/server-events");
       await publishServerEvent("test_event");
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "[SERVER_EVENTS] Tinybird publish error:",
+        "[SERVER_EVENTS] PostHog capture error:",
         expect.any(Error),
       );
 
       warnSpy.mockRestore();
     });
 
-    it("never throws even on ingest error", async () => {
-      process.env.TINYBIRD_TOKEN = "test-token";
+    it("never throws even on capture error", async () => {
+      process.env.POSTHOG_SERVER_KEY = "phx_test-key";
       jest.spyOn(console, "warn").mockImplementation();
-      mockIngest.mockRejectedValueOnce(new Error("Connection refused"));
+      mockCapture.mockImplementationOnce(() => {
+        throw new Error("Connection refused");
+      });
 
       const { publishServerEvent } = await import("@/lib/tracking/server-events");
       await expect(
@@ -126,34 +148,52 @@ describe("server-events", () => {
       jest.restoreAllMocks();
     });
 
-    it("sends only event_name and timestamp when no properties provided", async () => {
+    it("uses 'server' as distinctId when no userId provided", async () => {
+      process.env.POSTHOG_SERVER_KEY = "phx_test-key";
+
+      const { publishServerEvent } = await import("@/lib/tracking/server-events");
+      await publishServerEvent("minimal_event");
+
+      expect(mockCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          distinctId: "server",
+          event: "minimal_event",
+        }),
+      );
+    });
+
+    it("sends only event name with default properties when no properties provided", async () => {
       const consoleSpy = jest.spyOn(console, "log").mockImplementation();
 
       const { publishServerEvent } = await import("@/lib/tracking/server-events");
       await publishServerEvent("minimal_event");
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[FUNNEL] minimal_event",
-        {
-          event_name: "minimal_event",
-          timestamp: expect.any(String),
-        },
-      );
+      expect(consoleSpy).toHaveBeenCalledWith("[FUNNEL] minimal_event", {});
 
       consoleSpy.mockRestore();
     });
+  });
 
-    it("builds ingest endpoint with server_events__v1 datasource", async () => {
-      process.env.TINYBIRD_TOKEN = "test-token";
+  describe("flushServerEvents", () => {
+    it("calls shutdown on PostHog client when configured", async () => {
+      process.env.POSTHOG_SERVER_KEY = "phx_test-key";
 
-      const { publishServerEvent } = await import("@/lib/tracking/server-events");
-      await publishServerEvent("test_event");
-
-      expect(mockBuildIngestEndpoint).toHaveBeenCalledWith(
-        expect.objectContaining({
-          datasource: "server_events__v1",
-        }),
+      const { publishServerEvent, flushServerEvents } = await import(
+        "@/lib/tracking/server-events"
       );
+      // Initialize the client first
+      await publishServerEvent("init_event");
+      // Now flush
+      await flushServerEvents();
+
+      expect(mockShutdown).toHaveBeenCalledTimes(1);
+    });
+
+    it("does nothing when PostHog is not configured", async () => {
+      const { flushServerEvents } = await import("@/lib/tracking/server-events");
+      await flushServerEvents();
+
+      expect(mockShutdown).not.toHaveBeenCalled();
     });
   });
 });

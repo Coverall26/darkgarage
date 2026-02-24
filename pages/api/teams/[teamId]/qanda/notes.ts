@@ -32,7 +32,7 @@ export default async function handle(
     const { dataroomId, linkId, limit = "50", offset = "0" } = req.query;
 
     try {
-      const where: any = { teamId };
+      const where: Record<string, unknown> = { teamId };
       if (dataroomId) where.dataroomId = dataroomId;
       if (linkId) where.linkId = linkId;
 

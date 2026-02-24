@@ -1,30 +1,28 @@
 import type { AnalyticsProvider, AnalyticsProviderConfig, AnalyticsProviderType } from "./types";
-import { TinybirdAnalyticsProvider } from "./tinybird-adapter";
+import { PostHogAnalyticsProvider } from "./posthog-adapter";
 
 export * from "./types";
-export { TinybirdAnalyticsProvider } from "./tinybird-adapter";
+export { PostHogAnalyticsProvider } from "./posthog-adapter";
 
 let cachedProvider: AnalyticsProvider | null = null;
 let cachedProviderType: AnalyticsProviderType | null = null;
 
 function getAnalyticsConfigFromEnv(): AnalyticsProviderConfig {
-  const provider = (process.env.ANALYTICS_PROVIDER || "tinybird") as AnalyticsProviderType;
+  const provider = (process.env.ANALYTICS_PROVIDER || "posthog") as AnalyticsProviderType;
 
   return {
     provider,
-    apiKey: process.env.TINYBIRD_TOKEN,
-    host: process.env.TINYBIRD_HOST || "https://api.tinybird.co",
-    datasource: process.env.TINYBIRD_DATASOURCE,
+    apiKey: process.env.POSTHOG_SERVER_KEY || process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    host: process.env.POSTHOG_HOST || "https://us.i.posthog.com",
   };
 }
 
 export function createAnalyticsProvider(config?: AnalyticsProviderConfig): AnalyticsProvider {
-  const providerType = config?.provider || "tinybird";
+  const providerType = config?.provider || "posthog";
 
   switch (providerType) {
-    case "tinybird":
-      return new TinybirdAnalyticsProvider(config);
     case "posthog":
+      return new PostHogAnalyticsProvider(config);
     case "mixpanel":
     case "amplitude":
       throw new Error(`Analytics provider "${providerType}" is not yet implemented`);

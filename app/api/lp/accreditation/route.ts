@@ -4,6 +4,8 @@ import { logAccreditationEvent } from "@/lib/audit/audit-logger";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { AccreditationSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +90,6 @@ export async function GET(req: NextRequest) {
 
     const latestAck = user.investorProfile.accreditationAcks[0];
 
-    // @ts-ignore - Fields exist in schema, TS server may need restart
     const investorData = user.investorProfile as any;
     const ackData = latestAck as any;
 
@@ -132,7 +133,8 @@ export async function POST(req: NextRequest) {
     const auth = await requireLPAuthAppRouter();
     if (auth instanceof NextResponse) return auth;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, AccreditationSchema);
+    if (parsed.error) return parsed.error;
     const {
       accreditationType,
       accreditationDetails,
@@ -142,26 +144,17 @@ export async function POST(req: NextRequest) {
       confirmRepresentations,
       useSimplifiedPath,
       intendedCommitment,
-    } = body;
+      accreditationDocIds,
+      accreditationVerificationMethod,
+    } = parsed.data;
 
-    if (!accreditationType) {
-      return NextResponse.json(
-        { error: "Accreditation type is required" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      !confirmAccredited ||
-      !confirmRiskAware ||
-      !confirmDocReview ||
-      !confirmRepresentations
-    ) {
-      return NextResponse.json(
-        { error: "All acknowledgment checkboxes must be confirmed" },
-        { status: 400 },
-      );
-    }
+    // Validate doc IDs if provided — filter to non-empty strings
+    const validDocIds: string[] = Array.isArray(accreditationDocIds)
+      ? accreditationDocIds.filter(
+          (id: string) => id.length > 0,
+        )
+      : [];
+    const verificationMethodValue = accreditationVerificationMethod || null;
 
     const user = await prisma.user.findUnique({
       where: { id: auth.userId },
@@ -192,7 +185,7 @@ export async function POST(req: NextRequest) {
     const expirationDate = new Date();
     expirationDate.setFullYear(expirationDate.getFullYear() + 1);
 
-    const commitmentAmount = parseFloat(intendedCommitment) || 0;
+    const commitmentAmount = intendedCommitment ?? 0;
     const fundMinimum = user.investorProfile.fund?.minimumInvestment
       ? parseFloat(user.investorProfile.fund.minimumInvestment.toString())
       : 0;
@@ -211,10 +204,24 @@ export async function POST(req: NextRequest) {
     const isHighValueInvestor =
       commitmentAmount >= HIGH_VALUE_THRESHOLD ||
       fundMinimum >= HIGH_VALUE_THRESHOLD;
-    const verificationMethod =
-      useSimplifiedPath && isHighValueInvestor
+
+    // Document upload verification overrides auto-approval — GP must review docs
+    const hasDocumentUpload =
+      verificationMethodValue === "DOCUMENT_UPLOAD" && validDocIds.length > 0;
+    if (hasDocumentUpload) {
+      approvalDecision.autoApprove = false;
+      approvalDecision.needsReview = true;
+      approvalDecision.reason =
+        "Document upload verification — requires GP review";
+    }
+
+    const verificationMethod = hasDocumentUpload
+      ? "DOCUMENT_UPLOAD"
+      : useSimplifiedPath && isHighValueInvestor
         ? "SELF_ATTEST_HIGH_VALUE"
-        : "SELF_CERTIFIED";
+        : verificationMethodValue === "SELF_CERTIFICATION"
+          ? "SELF_CERTIFICATION"
+          : "SELF_CERTIFIED";
 
     const accreditationStatus = approvalDecision.autoApprove
       ? "SELF_CERTIFIED"
@@ -231,6 +238,12 @@ export async function POST(req: NextRequest) {
             : null,
           onboardingStep: approvalDecision.autoApprove ? 2 : 1,
           updatedAt: new Date(),
+          ...(validDocIds.length > 0 && {
+            accreditationDocumentIds: validDocIds,
+          }),
+          ...(verificationMethodValue && {
+            accreditationMethod: verificationMethodValue,
+          }),
         },
       }),
       prisma.accreditationAck.create({
@@ -245,6 +258,13 @@ export async function POST(req: NextRequest) {
             simplifiedPathUsed: useSimplifiedPath && isHighValueInvestor,
             highValueThreshold: HIGH_VALUE_THRESHOLD,
             approvalReason: approvalDecision.reason,
+            ...(validDocIds.length > 0 && {
+              documentUploadIds: validDocIds,
+              documentUploadCount: validDocIds.length,
+            }),
+            ...(verificationMethodValue && {
+              verificationMethod: verificationMethodValue,
+            }),
           },
           confirmAccredited,
           confirmRiskAware,
@@ -261,8 +281,14 @@ export async function POST(req: NextRequest) {
           sessionId,
           geoLocation,
           completedAt: approvalDecision.autoApprove ? new Date() : null,
-          completedSteps:
-            useSimplifiedPath && isHighValueInvestor
+          completedSteps: hasDocumentUpload
+            ? [
+                "type_selection",
+                "details",
+                "document_upload",
+                "acknowledgment",
+              ]
+            : useSimplifiedPath && isHighValueInvestor
               ? ["high_value_attestation", "acknowledgment"]
               : ["type_selection", "details", "acknowledgment"],
         },
@@ -284,11 +310,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: approvalDecision.autoApprove
-        ? isHighValueInvestor && useSimplifiedPath
-          ? "Simplified accreditation completed for high-value commitment"
-          : "Accreditation verification completed successfully"
-        : "Accreditation submitted for review",
+      message: hasDocumentUpload
+        ? "Accreditation documents submitted for GP review"
+        : approvalDecision.autoApprove
+          ? isHighValueInvestor && useSimplifiedPath
+            ? "Simplified accreditation completed for high-value commitment"
+            : "Accreditation verification completed successfully"
+          : "Accreditation submitted for review",
       accreditationStatus,
       accreditationType,
       verificationMethod,
@@ -298,6 +326,7 @@ export async function POST(req: NextRequest) {
       autoApproved: approvalDecision.autoApprove,
       needsManualReview: approvalDecision.needsReview,
       approvalReason: approvalDecision.reason,
+      documentUploadCount: validDocIds.length,
     });
   } catch (error: unknown) {
     reportError(error as Error);

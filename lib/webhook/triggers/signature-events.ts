@@ -38,7 +38,6 @@ export async function emitSignatureEvent({
   data: SignatureEventData;
 }) {
   try {
-    // @ts-ignore - Model exists in schema, TS server may need restart
     await prisma.signatureAuditLog.create({
       data: {
         documentId: data.documentId,

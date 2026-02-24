@@ -5,7 +5,25 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import { sendEmail } from "@/lib/resend";
 import { randomBytes } from "crypto";
+import { z } from "zod";
 import SignatureRequestEmail from "@/components/emails/signature-request";
+
+const CreateSubscriptionSchema = z.object({
+  investorId: z.string().min(1, "Investor ID is required"),
+  fundId: z.string().optional(),
+  amount: z.union([z.number(), z.string()]).transform((val) => {
+    const num = typeof val === "string" ? parseFloat(val) : val;
+    if (isNaN(num) || num <= 0) throw new Error("Amount must be positive");
+    if (num > 100e9) throw new Error("Amount exceeds maximum");
+    return num;
+  }),
+  file: z.string().min(1, "File is required"),
+  title: z.string().max(500).optional(),
+  description: z.string().max(2000).optional(),
+  emailSubject: z.string().max(500).optional(),
+  emailMessage: z.string().max(5000).optional(),
+  teamId: z.string().min(1, "Team ID is required"),
+});
 
 export const config = {
   api: {
@@ -30,6 +48,13 @@ export default async function handler(
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    const parsed = CreateSubscriptionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: parsed.error.issues[0]?.message || "Invalid request body",
+      });
+    }
+
     const {
       investorId,
       fundId,
@@ -40,13 +65,7 @@ export default async function handler(
       emailSubject,
       emailMessage,
       teamId,
-    } = req.body;
-
-    if (!investorId || !amount || !file || !teamId) {
-      return res.status(400).json({
-        error: "Investor ID, amount, file, and team ID are required",
-      });
-    }
+    } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
@@ -82,20 +101,20 @@ export default async function handler(
     const document = await prisma.signatureDocument.create({
       data: {
         title: title || `Subscription Agreement - ${investor.entityName || investor.user?.name || "Investor"}`,
-        description: description || `Subscription amount: $${parseFloat(amount).toLocaleString()}`,
+        description: description || `Subscription amount: $${amount.toLocaleString()}`,
         file,
         storageType: "S3_PATH",
         status: "SENT",
         sentAt: new Date(),
         emailSubject: emailSubject || "Action Required: Sign Your Subscription Agreement",
-        emailMessage: emailMessage || `Please review and sign your subscription agreement for $${parseFloat(amount).toLocaleString()}.`,
+        emailMessage: emailMessage || `Please review and sign your subscription agreement for $${amount.toLocaleString()}.`,
         documentType: "SUBSCRIPTION",
-        subscriptionAmount: parseFloat(amount),
+        subscriptionAmount: amount,
         investorId,
         metadata: {
           fundId: fundId || null,
           createdByEmail: session.user.email,
-          subscriptionAmount: parseFloat(amount),
+          subscriptionAmount: amount,
         },
         teamId,
         createdById: user.id,
@@ -120,7 +139,7 @@ export default async function handler(
         investorId,
         fundId: fundId || null,
         signatureDocumentId: document.id,
-        amount: parseFloat(amount),
+        amount,
         status: "PENDING",
       },
     });
@@ -137,7 +156,7 @@ export default async function handler(
             documentTitle: document.title,
             senderName: "FundRoom",
             teamName: team.name,
-            message: `Subscription Amount: $${parseFloat(amount).toLocaleString()}`,
+            message: `Subscription Amount: $${amount.toLocaleString()}`,
             signingUrl: signingUrl,
           }),
         });

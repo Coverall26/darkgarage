@@ -25,7 +25,7 @@ export const moveDataroomDocumentToFolder = async ({
   // Optimistically update the UI by removing the documents from current folder
   mutate(
     key,
-    (documents: any[] | undefined) => {
+    (documents: Array<{ id: string }> | undefined) => {
       if (!documents) return documents;
 
       // Filter out the documents that are being moved
@@ -43,12 +43,12 @@ export const moveDataroomDocumentToFolder = async ({
   // Optimistically update the UI by removing the folder from current folders
   mutate(
     folderKey,
-    (folder: any) => {
+    (folder: Array<{ id: string }> | undefined) => {
       if (!folder) return folder;
 
       // Filter out the folder that are being moved
       const updatedFolder = folder.filter(
-        (doc: any) => !folderIds.includes(doc.id),
+        (doc: { id: string }) => !folderIds.includes(doc.id),
       );
       // Return the updated list of folder
       return updatedFolder;

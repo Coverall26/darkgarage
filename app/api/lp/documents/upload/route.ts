@@ -8,6 +8,8 @@ import { appRouterUploadRateLimit } from "@/lib/security/rate-limiter";
 import { CustomUser } from "@/lib/types";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
 import { resolveDocumentStorageType } from "@/lib/storage/resolve-storage-type";
+import { validateBody } from "@/lib/middleware/validate";
+import { LpDocumentUploadSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -195,7 +197,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = (await req.json()) as UploadRequest;
+    const parsed = await validateBody(req, LpDocumentUploadSchema);
+    if (parsed.error) return parsed.error;
     const {
       title,
       documentType,
@@ -207,26 +210,7 @@ export async function POST(req: NextRequest) {
       fileData,
       fileName,
       mimeType,
-    } = body;
-
-    if (!title || !documentType || !fundId || !fileData || !fileName) {
-      return NextResponse.json(
-        {
-          error:
-            "Missing required fields: title, documentType, fundId, fileData, fileName",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (!LPDocumentTypeValues.includes(documentType as any)) {
-      return NextResponse.json(
-        {
-          error: `Invalid document type. Must be one of: ${LPDocumentTypeValues.join(", ")}`,
-        },
-        { status: 400 },
-      );
-    }
+    } = parsed.data;
 
     const investor = await prisma.investor.findUnique({
       where: { id: context.investorId },

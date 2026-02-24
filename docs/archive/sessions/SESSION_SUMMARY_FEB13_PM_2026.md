@@ -47,9 +47,9 @@ Added demo credentials to:
 Demo accounts:
 | Role | Email | Password |
 |------|-------|----------|
-| GP (Fund Manager) | joe@bermudafranchisegroup.com | FundRoom2026! |
-| LP (Investor) | demo-investor@example.com | Investor2026! |
-| Admin | rciesco@fundroom.ai | (see ADMIN_TEMP_PASSWORD secret) |
+| GP (Fund Manager) | joe@bermudafranchisegroup.com | (see `GP_SEED_PASSWORD` env var) |
+| LP (Investor) | demo-investor@example.com | (see `LP_SEED_PASSWORD` env var) |
+| Admin | rciesco@fundroom.ai | (see `ADMIN_TEMP_PASSWORD` env var) |
 | Dataroom URL | /d/bermuda-club-fund | — |
 
 ## Current State

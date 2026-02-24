@@ -38,7 +38,6 @@ export async function triggerPersonaVerification({
   }
 
   try {
-    // @ts-ignore - Field exists at runtime
     const investor = await prisma.investor.findFirst({
       where: {
         user: { email },
@@ -58,13 +57,17 @@ export async function triggerPersonaVerification({
       return;
     }
 
-    // @ts-ignore - Field exists at runtime
-    if (investor.personaStatus === "APPROVED") {
+    // Persona fields are added via raw SQL migration and may not be in Prisma types yet
+    const investorData = investor as typeof investor & {
+      personaStatus?: string;
+      personaInquiryId?: string;
+    };
+
+    if (investorData.personaStatus === "APPROVED") {
       return;
     }
 
-    // @ts-ignore - Field exists at runtime
-    if (investor.personaInquiryId && investor.personaStatus === "PENDING") {
+    if (investorData.personaInquiryId && investorData.personaStatus === "PENDING") {
       return;
     }
 
@@ -84,8 +87,7 @@ export async function triggerPersonaVerification({
       lastName,
     });
 
-    // Update investor with Persona inquiry details
-    // @ts-ignore - Persona fields exist at runtime after schema push
+    // Update investor with Persona inquiry details (raw SQL for Persona-specific columns)
     await prisma.$executeRaw`
       UPDATE "Investor" 
       SET "personaInquiryId" = ${inquiry.id},

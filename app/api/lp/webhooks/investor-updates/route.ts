@@ -66,14 +66,14 @@ export async function POST(req: NextRequest) {
 
     if (WEBHOOK_SECRET) {
       if (!verifyWebhookSignature(rawBody, signature)) {
-        console.warn("Webhook signature verification failed");
+        reportError(new Error("Webhook signature verification failed: investor-updates"));
         return NextResponse.json(
           { error: "Invalid signature" },
           { status: 401 },
         );
       }
     } else if (!isAllowedSource(req)) {
-      console.warn("Webhook from unauthorized source without signature");
+      reportError(new Error("Webhook from unauthorized source without signature: investor-updates"));
       return NextResponse.json(
         { error: "Unauthorized source" },
         { status: 401 },
@@ -186,6 +186,16 @@ async function handleDistributionEvent(
   auditEntry: Record<string, any>,
 ) {
   if (data.distributionId && data.amount) {
+    // Resolve teamId from fund for multi-tenant defense-in-depth
+    let teamId: string | undefined;
+    if (fundId) {
+      const fund = await prisma.fund.findUnique({
+        where: { id: fundId },
+        select: { teamId: true },
+      });
+      teamId = fund?.teamId || undefined;
+    }
+
     await prisma.transaction.create({
       data: {
         investorId,
@@ -193,6 +203,7 @@ async function handleDistributionEvent(
         amount: data.amount,
         distributionId: data.distributionId,
         fundId,
+        teamId,
         status: data.status || "PENDING",
         description:
           data.description ||

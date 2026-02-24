@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
+import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,9 @@ export const dynamic = "force-dynamic";
  * Used by Manual Investor Entry wizard Step 1 on email blur.
  */
 export async function GET(req: NextRequest) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

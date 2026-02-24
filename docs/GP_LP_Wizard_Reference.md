@@ -20,7 +20,7 @@ All SEC compliance from your docs is baked in — 506(b)/506(c) logic, March 202
 
 Instructions: Claude Code prompt. To use it:
 1.	Reference the JSX code below (also available as `components/showcase/fundroom-wizard.jsx` in the repo)
-2.	Drop this prompt into Claude Code in your darkroom-main directory
+2.	Drop this prompt into Claude Code in your project directory
 The prompt is structured so Claude Code will:
 Read first — CLAUDE.md, schema, this JSX reference (`docs/GP_LP_Wizard_Reference.md`), existing app routes and components (so it doesn't duplicate what exists)
 Build in order:

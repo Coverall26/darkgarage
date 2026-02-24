@@ -4,7 +4,6 @@ import { authOptions } from "@/lib/auth/auth-options";
 import { getServerSession } from "next-auth/next";
 
 import prisma from "@/lib/prisma";
-import { getWebhookEvents } from "@/lib/tinybird/pipes";
 import { CustomUser } from "@/lib/types";
 import { reportError } from "@/lib/error";
 
@@ -33,7 +32,8 @@ export default async function handler(
 
   if (req.method === "GET") {
     try {
-      const { pId } = await prisma.webhook.findUniqueOrThrow({
+      // Verify webhook exists and belongs to team
+      await prisma.webhook.findUniqueOrThrow({
         where: {
           id: webhookId,
           teamId,
@@ -43,16 +43,8 @@ export default async function handler(
         },
       });
 
-      const events = await getWebhookEvents({
-        webhookId: pId,
-      });
-
-      const parsedEvents = events.data.map((event) => ({
-        ...event,
-        request_body: JSON.parse(event.request_body as string),
-      }));
-
-      return res.status(200).json(parsedEvents);
+      // Webhook events have no Prisma model - return empty data
+      return res.status(200).json([]);
     } catch (error) {
       reportError(error as Error);
       console.error(error);

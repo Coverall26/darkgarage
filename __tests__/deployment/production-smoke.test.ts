@@ -120,6 +120,28 @@ jest.mock("@/lib/sse/event-emitter", () => ({
   },
 }));
 
+// Health check mocks — checkDatabaseHealth is patched onto the module
+// at line ~274 below (after import). Do NOT override jest.mock("@/lib/prisma")
+// here, as it would lose the global jest.setup.ts mock with $transaction as jest.fn().
+jest.mock("@/lib/redis", () => ({
+  __esModule: true,
+  default: null,
+  checkRedisHealth: jest.fn().mockResolvedValue({ connected: false }),
+  ratelimit: jest.fn().mockReturnValue({
+    limit: jest.fn().mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: Date.now() + 60000 }),
+  }),
+  __mockRateLimitFn: jest.fn().mockResolvedValue({ success: true, limit: 100, remaining: 99, reset: Date.now() + 60000 }),
+}));
+jest.mock("@/lib/resend", () => ({
+  __esModule: true,
+  isResendConfigured: jest.fn().mockReturnValue(false),
+  sendEmail: jest.fn().mockResolvedValue(undefined),
+  sendOrgEmail: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock("@/lib/env", () => ({
+  validateEnv: jest.fn().mockReturnValue({ valid: true, missing: [], errors: [] }),
+}));
+
 // Tracking mocks
 jest.mock("@/lib/tracking/server-events", () => ({
   publishServerEvent: jest.fn().mockResolvedValue(undefined),

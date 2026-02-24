@@ -8,6 +8,8 @@ import {
 } from "@/lib/marketplace";
 import { verifyNotBot } from "@/lib/security/bot-protection";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { DealNoteSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -48,21 +50,16 @@ export async function POST(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
-
-    if (!body.content) {
-      return NextResponse.json(
-        { error: "content is required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, DealNoteSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
     const note = await createDealNote(
       dealId,
       {
         content: body.content,
-        isPrivate: body.isPrivate,
-        pinned: body.pinned,
+        isPrivate: body.isInternal,
+        pinned: undefined,
       },
       auth.userId,
     );
@@ -85,21 +82,26 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const url = new URL(req.url);
+    const noteId = url.searchParams.get("noteId");
 
-    if (!body.noteId) {
+    if (!noteId) {
       return NextResponse.json(
-        { error: "noteId is required" },
+        { error: "noteId query parameter is required" },
         { status: 400 },
       );
     }
 
+    const parsed = await validateBody(req, DealNoteSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
+
     const note = await updateDealNote(
-      body.noteId,
+      noteId,
       {
         content: body.content,
-        isPrivate: body.isPrivate,
-        pinned: body.pinned,
+        isPrivate: body.isInternal,
+        pinned: undefined,
       },
       auth.userId,
     );

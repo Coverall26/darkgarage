@@ -66,7 +66,7 @@ FundRoom is a multi-tenant, security-first fund operations SaaS platform built o
 │   PostgreSQL  │   │                  │   │                  │
 │               │   │   AWS S3 / KMS   │   │   Resend (email) │
 │   117 models  │   │   Vercel Blob    │   │   Rollbar (errors)│
-│   40 enums    │   │   CloudFront CDN │   │   Tinybird (analytics)│
+│   40 enums    │   │   CloudFront CDN │   │   PostHog (analytics) │
 │   ~1,694 cols │   │                  │   │   Persona (KYC)  │
 │   ~530 indexes│   │   Per-org key    │   │   Stripe (billing)│
 │               │   │   prefixes       │   │   Upstash (Redis)│
@@ -592,7 +592,7 @@ sendOrgEmail() → Tier 2 (lib/resend.ts, resolves org domain from DB)
 | Email | Resend + React Email | 6.5 / 5.0 |
 | E-Signature | FundRoom Sign (native) | pdf-lib 1.17 |
 | Storage | AWS S3 / Vercel Blob | KMS encrypted |
-| Monitoring | Rollbar + Tinybird + PostHog | Server + client |
+| Monitoring | Rollbar + PostHog | Server + client |
 | Testing | Jest + React Testing Library | Jest 30 |
 | Hosting | Vercel | Serverless |
 | CI/CD | GitHub Actions | 4 workflows |

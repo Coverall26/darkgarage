@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { clearTierCache } from "@/lib/tier";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundroomActivationActionSchema } from "@/lib/validations/teams";
 
 /**
  * GET /api/teams/[teamId]/fundroom-activation
@@ -109,15 +111,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized. Team owner access required." }, { status: 403 });
     }
 
-    const body = await req.json();
-    const { action, reason, fundId } = body as { action: string; reason?: string; fundId?: string };
-
-    if (!action || !VALID_ACTIONS.includes(action as ActivationAction)) {
-      return NextResponse.json(
-        { error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(", ")}` },
-        { status: 400 },
-      );
-    }
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, FundroomActivationActionSchema);
+    if (parsed.error) return parsed.error;
+    const { action, reason, fundId } = parsed.data;
 
     // Find existing activation
     const where = fundId

@@ -125,8 +125,8 @@ export class LocalStorageProvider implements StorageProvider {
       }
 
       return data;
-    } catch (error: any) {
-      if (error.code === "ENOENT") {
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return null;
       }
       console.error("Error reading local file:", error);
@@ -169,8 +169,8 @@ export class LocalStorageProvider implements StorageProvider {
       }
       
       return true;
-    } catch (error: any) {
-      if (error.code === "ENOENT") {
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return true;
       }
       console.error("Error deleting local file:", error);
@@ -270,8 +270,8 @@ export class LocalStorageProvider implements StorageProvider {
         contentType,
         metadata,
       };
-    } catch (error: any) {
-      if (error.code === "ENOENT") {
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return null;
       }
       throw error;

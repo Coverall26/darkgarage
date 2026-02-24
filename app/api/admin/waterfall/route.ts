@@ -37,11 +37,11 @@ export async function GET(req: NextRequest) {
   });
 
   const waterfallData = funds.map((fund) => {
-    const customSettings = (fund.customSettings as any) || {};
-    const preferredReturn = customSettings.preferredReturn || 8;
-    const carriedInterest = customSettings.carriedInterest || 20;
-    const catchUpPercentage = customSettings.catchUpPercentage || 100;
-    const hurdleRate = customSettings.hurdleRate || 0;
+    const customSettings = (fund.customSettings as Record<string, unknown>) || {};
+    const preferredReturn = Number(customSettings.preferredReturn) || 8;
+    const carriedInterest = Number(customSettings.carriedInterest) || 20;
+    const catchUpPercentage = Number(customSettings.catchUpPercentage) || 100;
+    const hurdleRate = Number(customSettings.hurdleRate) || 0;
 
     const totalCapitalContributed = fund.investments.reduce(
       (sum, inv) => sum + Number(inv.fundedAmount),

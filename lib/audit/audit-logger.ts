@@ -198,8 +198,8 @@ export async function logAuditEventFromRequest(
   data: Omit<AuditLogData, "ipAddress" | "userAgent">
 ): Promise<string | null> {
   const headers = req instanceof NextRequest ? req.headers : req.headers;
-  const ipAddress = getIpFromHeaders(headers as any);
-  const userAgent = getUserAgent(headers as any);
+  const ipAddress = getIpFromHeaders(headers as Headers | { [key: string]: string | string[] | undefined });
+  const userAgent = getUserAgent(headers as Headers | { [key: string]: string | string[] | undefined });
   
   return logAuditEvent({
     ...data,

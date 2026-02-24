@@ -30,7 +30,7 @@ export async function GET(
     const userTeam = await prisma.userTeam.findFirst({
       where: {
         teamId,
-        userId: (session.user as any).id,
+        userId: session.user.id,
         role: { in: ["OWNER", "ADMIN", "SUPER_ADMIN", "MANAGER"] },
       },
     });
@@ -122,7 +122,7 @@ export async function POST(
     const userTeam = await prisma.userTeam.findFirst({
       where: {
         teamId,
-        userId: (session.user as any).id,
+        userId: session.user.id,
         role: { in: ["OWNER", "ADMIN", "SUPER_ADMIN"] },
       },
     });
@@ -169,7 +169,7 @@ export async function POST(
         numPages,
         fundId,
         teamId,
-        createdById: (session.user as any).id,
+        createdById: session.user.id,
         status: "DRAFT",
       },
     });

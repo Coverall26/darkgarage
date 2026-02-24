@@ -175,8 +175,8 @@ describe('Phase 1: Visitor/LP Side - Dataroom Access E2E', () => {
       expect(view?.pageCount).toBe(3);
     });
 
-    it('should associate views with Tinybird analytics', async () => {
-      const tinybirdEvent = {
+    it('should associate views with analytics events', async () => {
+      const analyticsEvent = {
         event_type: 'document_view',
         document_id: 'doc-ppm',
         dataroom_id: 'dataroom-bermuda',
@@ -186,8 +186,8 @@ describe('Phase 1: Visitor/LP Side - Dataroom Access E2E', () => {
         duration_seconds: 45,
       };
 
-      expect(tinybirdEvent.event_type).toBe('document_view');
-      expect(tinybirdEvent.document_id).toBe('doc-ppm');
+      expect(analyticsEvent.event_type).toBe('document_view');
+      expect(analyticsEvent.document_id).toBe('doc-ppm');
     });
   });
 

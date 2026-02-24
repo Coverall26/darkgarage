@@ -4,9 +4,11 @@ import { authOptions } from "@/lib/auth/auth-options";
 import slugify from "@sindresorhus/slugify";
 import { getServerSession } from "next-auth/next";
 
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
 import { reportError } from "@/lib/error";
+import { FolderCreateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -103,7 +105,13 @@ export default async function handle(
     const userId = (session.user as CustomUser).id;
 
     const { teamId } = req.query as { teamId: string };
-    const { name, path } = req.body as { name: string; path: string };
+    const parsed = validateBodyPagesRouter(req.body, FolderCreateSchema);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const { name, path } = parsed.data;
 
     const parentFolderPath = path ? "/" + path : "/";
 

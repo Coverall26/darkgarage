@@ -127,10 +127,6 @@ export default function WorkflowAccessView({
 
       const result = await response.json();
 
-      console.log("--------------------------------");
-      console.log("result", result);
-      console.log("--------------------------------");
-
       if (!response.ok) {
         // Show 404 for inactive/deleted workflows
         if (response.status === 403 && result.error?.includes("inactive")) {

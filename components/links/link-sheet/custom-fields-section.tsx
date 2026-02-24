@@ -39,7 +39,6 @@ export default function CustomFieldsSection({
 
   useEffect(() => {
     if (isAllowed && presets?.enableCustomFields && presets?.customFields) {
-      console.log("presets", presets.customFields);
       setEnabled(true);
       setData((prevData) => ({
         ...prevData,

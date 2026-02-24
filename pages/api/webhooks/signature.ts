@@ -61,7 +61,7 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  let body: any;
+  let body: { event: string; documentId: string; recipientId: string; reason?: string };
   try {
     const rawBody = await getRawBody(req);
     const signature = req.headers["x-signature"] as string | undefined;
@@ -294,7 +294,18 @@ async function handleDocumentDeclined(req: NextApiRequest, documentId: string, r
 
 }
 
-async function sendCompletionNotification(document: any, investor: any) {
+interface CompletionDocument {
+  id: string;
+  title: string;
+  team: { id: string; name: string } | null;
+}
+
+interface CompletionInvestor {
+  id: string;
+  user: { email: string | null; name: string | null } | null;
+}
+
+async function sendCompletionNotification(document: CompletionDocument, investor: CompletionInvestor | null) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://app.fundroom.ai";
   const certificateUrl = `${baseUrl}/sign/certificate/${document.id}`;
 

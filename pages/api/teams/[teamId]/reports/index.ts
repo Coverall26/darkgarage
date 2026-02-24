@@ -31,7 +31,7 @@ export default async function handle(
     try {
       const { type } = req.query;
 
-      const where: any = { teamId };
+      const where: Record<string, unknown> = { teamId };
       if (type) {
         where.reportType = type;
       }

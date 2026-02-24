@@ -13,6 +13,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { resolveCrmRole, hasCrmPermission } from "@/lib/auth/crm-roles";
+import { validateBody } from "@/lib/middleware/validate";
+import { OutreachTemplateUpdateSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -133,19 +135,16 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, OutreachTemplateUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
     const data: Record<string, unknown> = {};
 
     if (body.name !== undefined) {
-      if (typeof body.name !== "string" || !body.name.trim()) {
+      if (!body.name.trim()) {
         return NextResponse.json(
           { error: "Template name cannot be empty" },
-          { status: 400 },
-        );
-      }
-      if (body.name.length > 100) {
-        return NextResponse.json(
-          { error: "Template name too long (max 100 chars)" },
           { status: 400 },
         );
       }
@@ -153,15 +152,9 @@ export async function PATCH(
     }
 
     if (body.subject !== undefined) {
-      if (typeof body.subject !== "string" || !body.subject.trim()) {
+      if (!body.subject.trim()) {
         return NextResponse.json(
           { error: "Subject cannot be empty" },
-          { status: 400 },
-        );
-      }
-      if (body.subject.length > 500) {
-        return NextResponse.json(
-          { error: "Subject too long (max 500 chars)" },
           { status: 400 },
         );
       }
@@ -169,15 +162,9 @@ export async function PATCH(
     }
 
     if (body.body !== undefined) {
-      if (typeof body.body !== "string" || !body.body.trim()) {
+      if (!body.body.trim()) {
         return NextResponse.json(
           { error: "Body cannot be empty" },
-          { status: 400 },
-        );
-      }
-      if (body.body.length > 50_000) {
-        return NextResponse.json(
-          { error: "Body too long (max 50,000 chars)" },
           { status: 400 },
         );
       }

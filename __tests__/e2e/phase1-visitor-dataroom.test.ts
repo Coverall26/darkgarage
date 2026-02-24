@@ -294,8 +294,8 @@ describe('Phase 1: Visitor/LP Side - Dataroom Access E2E', () => {
       expect(view?.pageCount).toBe(3);
     });
 
-    it('should associate views with Tinybird analytics', async () => {
-      const tinybirdEvent = {
+    it('should associate views with analytics events', async () => {
+      const analyticsEvent = {
         event_type: 'document_view',
         document_id: 'doc-ppm',
         dataroom_id: 'dataroom-bermuda',
@@ -305,8 +305,8 @@ describe('Phase 1: Visitor/LP Side - Dataroom Access E2E', () => {
         duration_seconds: 45,
       };
 
-      expect(tinybirdEvent.event_type).toBe('document_view');
-      expect(tinybirdEvent.document_id).toBe('doc-ppm');
+      expect(analyticsEvent.event_type).toBe('document_view');
+      expect(analyticsEvent.document_id).toBe('doc-ppm');
     });
   });
 
@@ -3273,7 +3273,7 @@ describe('Phase 1: Reporting & CRM Dashboard', () => {
     });
   });
 
-  describe('Analytics: IRR/ROI Queries (Tinybird)', () => {
+  describe('Analytics: IRR/ROI Queries', () => {
     it('should calculate simple ROI', () => {
       const invested = 100000;
       const currentValue = 125000;
@@ -3293,8 +3293,8 @@ describe('Phase 1: Reporting & CRM Dashboard', () => {
       expect(cashFlows[2].amount).toBeGreaterThan(0);
     });
 
-    it('should query Tinybird for analytics data', () => {
-      const tinybirdQuery = {
+    it('should query analytics data', () => {
+      const analyticsQuery = {
         endpoint: 'investor_analytics',
         params: {
           investorId: 'investor-1',
@@ -3303,10 +3303,10 @@ describe('Phase 1: Reporting & CRM Dashboard', () => {
         },
       };
 
-      expect(tinybirdQuery.endpoint).toBe('investor_analytics');
+      expect(analyticsQuery.endpoint).toBe('investor_analytics');
     });
 
-    it('should return performance metrics from Tinybird', () => {
+    it('should return performance metrics', () => {
       const performanceData = {
         irr: 18.5,
         roi: 25.3,
@@ -3352,7 +3352,7 @@ describe('Phase 1: Reporting & CRM Dashboard', () => {
       expect(cacheConfig.ttlSeconds).toBe(300);
     });
 
-    it('should handle Tinybird API errors gracefully', () => {
+    it('should handle analytics API errors gracefully', () => {
       const errorResponse = {
         error: 'RATE_LIMIT_EXCEEDED',
         message: 'Too many requests',
@@ -9805,19 +9805,19 @@ describe('Phase 2: External Integrations', () => {
     });
   });
 
-  describe('Tinybird Analytics Integration', () => {
-    it('should configure Tinybird connection', () => {
-      const tinybirdConfig = {
-        apiHost: 'https://api.tinybird.co',
-        authToken: 'tb_token_xxx',
-        workspace: 'fundroom',
+  describe('PostHog Analytics Integration', () => {
+    it('should configure PostHog connection', () => {
+      const posthogConfig = {
+        apiHost: 'https://us.i.posthog.com',
+        apiKey: 'phx_key_xxx',
+        project: 'fundroom',
         environment: 'production',
       };
 
-      expect(tinybirdConfig.workspace).toBe('fundroom');
+      expect(posthogConfig.project).toBe('fundroom');
     });
 
-    it('should send events to Tinybird', () => {
+    it('should send events to PostHog', () => {
       const eventPayload = {
         datasource: 'page_views',
         events: [
@@ -9929,7 +9929,7 @@ describe('Phase 2: External Integrations', () => {
       expect(realtimeQuery.response.data.activeUsers).toBe(12);
     });
 
-    it('should track audit events in Tinybird', () => {
+    it('should track audit events in analytics', () => {
       const auditEvent = {
         datasource: 'audit_log',
         event: {
@@ -9946,7 +9946,7 @@ describe('Phase 2: External Integrations', () => {
       expect(auditEvent.event.eventType).toBe('SUBSCRIPTION_COMPLETED');
     });
 
-    it('should handle Tinybird API errors', () => {
+    it('should handle analytics API errors', () => {
       const apiError = {
         status: 429,
         error: {
@@ -10035,7 +10035,7 @@ describe('Phase 2: External Integrations', () => {
       const healthStatus = {
         quickbooks: { status: 'healthy', lastCheck: new Date(), latencyMs: 120 },
         persona: { status: 'healthy', lastCheck: new Date(), latencyMs: 85 },
-        tinybird: { status: 'healthy', lastCheck: new Date(), latencyMs: 45 },
+        posthog: { status: 'healthy', lastCheck: new Date(), latencyMs: 45 },
         plaid: { status: 'degraded', lastCheck: new Date(), latencyMs: 500 },
       };
 
@@ -10059,10 +10059,10 @@ describe('Phase 2: External Integrations', () => {
       const uptimeMetrics = {
         quickbooks: { uptime: 99.5, last30Days: 99.8 },
         persona: { uptime: 99.9, last30Days: 99.95 },
-        tinybird: { uptime: 100, last30Days: 99.99 },
+        posthog: { uptime: 100, last30Days: 99.99 },
       };
 
-      expect(uptimeMetrics.tinybird.uptime).toBe(100);
+      expect(uptimeMetrics.posthog.uptime).toBe(100);
     });
 
     it('should support integration failover', () => {

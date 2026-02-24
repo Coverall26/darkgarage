@@ -14,6 +14,8 @@ import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterStrictRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { MfaSetupVerifySchema, MfaCodeSchema } from "@/lib/validations/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -68,12 +70,9 @@ export async function PUT(req: NextRequest) {
 
   // Step 2: Verify code and enable MFA
   try {
-    const body = await req.json();
-    const { code } = body;
-
-    if (!code || typeof code !== "string" || code.length !== 6) {
-      return NextResponse.json({ error: "Valid 6-digit code required" }, { status: 400 });
-    }
+    const parsed = await validateBody(req, MfaSetupVerifySchema);
+    if (parsed.error) return parsed.error;
+    const { code } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -147,12 +146,9 @@ export async function DELETE(req: NextRequest) {
 
   // Disable MFA
   try {
-    const body = await req.json();
-    const { code } = body;
-
-    if (!code || typeof code !== "string") {
-      return NextResponse.json({ error: "Verification code required" }, { status: 400 });
-    }
+    const parsed = await validateBody(req, MfaCodeSchema);
+    if (parsed.error) return parsed.error;
+    const { code } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },

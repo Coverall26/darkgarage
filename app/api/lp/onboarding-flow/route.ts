@@ -16,6 +16,8 @@ import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { OnboardingFlowUpdateSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -94,26 +96,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { fundId, currentStep, formData, stepsCompleted } = body;
-
-    if (!fundId) {
-      return NextResponse.json(
-        { error: "fundId is required" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      typeof currentStep !== "number" ||
-      currentStep < 0 ||
-      currentStep > 10
-    ) {
-      return NextResponse.json(
-        { error: "Invalid currentStep" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, OnboardingFlowUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const { fundId, currentStep, formData, stepsCompleted } = parsed.data;
 
     // Verify fund exists
     const fund = await prisma.fund.findUnique({

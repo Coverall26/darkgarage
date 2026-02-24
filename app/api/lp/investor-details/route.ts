@@ -5,6 +5,8 @@ import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { encryptTaxId } from "@/lib/crypto/secure-storage";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { InvestorDetailsSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,8 @@ export async function POST(req: NextRequest) {
     const auth = await requireLPAuthAppRouter();
     if (auth instanceof NextResponse) return auth;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, InvestorDetailsSchema);
+    if (parsed.error) return parsed.error;
     const {
       fundId,
       entityType,
@@ -35,34 +38,7 @@ export async function POST(req: NextRequest) {
       authorizedSignerName,
       authorizedSignerTitle,
       authorizedSignerEmail,
-    } = body;
-
-    if (!entityType) {
-      return NextResponse.json(
-        { error: "Entity type is required" },
-        { status: 400 },
-      );
-    }
-
-    const validTypes = [
-      "INDIVIDUAL",
-      "JOINT",
-      "TRUST",
-      "LLC",
-      "CORPORATION",
-      "PARTNERSHIP",
-      "IRA",
-      "RETIREMENT",
-      "CHARITY",
-      "FOUNDATION",
-      "OTHER",
-    ];
-    if (!validTypes.includes(entityType)) {
-      return NextResponse.json(
-        { error: "Invalid entity type" },
-        { status: 400 },
-      );
-    }
+    } = parsed.data;
 
     // Find the investor profile
     const user = await prisma.user.findUnique({

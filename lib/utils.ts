@@ -22,9 +22,9 @@ export function classNames(...classes: string[]) {
   return uniqueClasses.join(" ");
 }
 
-export function getExtension(url: string) {
-  // @ts-ignore
-  return url.split(/[#?]/)[0].split(".").pop().trim();
+export function getExtension(url: string): string {
+  const ext = url.split(/[#?]/)[0].split(".").pop()?.trim();
+  return ext || "";
 }
 
 /**
@@ -59,7 +59,7 @@ export async function fetcher<JSON = any>(
   return res.json();
 }
 
-export const logStore = async ({ object }: { object: any }) => {
+export const logStore = async ({ object }: { object: unknown }) => {
   /* If in development or env variable not set, log to the console */
   if (
     process.env.NODE_ENV === "development" ||
@@ -781,7 +781,7 @@ export const parseDateTime = (str: Date | string) => {
  */
 export function safeTemplateReplace(
   template: string,
-  data: Record<string, any>,
+  data: Record<string, string | number | boolean | null | undefined>,
 ): string {
   // Define allowed template variables - only these will be replaced
   const allowedVariables = ["email", "date", "time", "link", "ipAddress"];
@@ -803,28 +803,28 @@ export function safeTemplateReplace(
  * Converts BigInt fileSize values to numbers for safe serialization
  * Recursively processes objects and arrays, converting only fileSize fields
  */
-export function serializeFileSize(obj: any): any {
+export function serializeFileSize<T>(obj: T): T {
   if (obj === null || obj === undefined) {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(serializeFileSize);
+    return obj.map(serializeFileSize) as T;
   }
 
   if (typeof obj === "object") {
-    const serialized: any = {};
+    const serialized: Record<string, unknown> = {};
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        if (key === "fileSize" && typeof obj[key] === "bigint") {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (key === "fileSize" && typeof (obj as Record<string, unknown>)[key] === "bigint") {
           // Convert BigInt fileSize to number
-          serialized[key] = Number(obj[key]);
+          serialized[key] = Number((obj as Record<string, unknown>)[key]);
         } else {
-          serialized[key] = serializeFileSize(obj[key]);
+          serialized[key] = serializeFileSize((obj as Record<string, unknown>)[key]);
         }
       }
     }
-    return serialized;
+    return serialized as T;
   }
 
   return obj;

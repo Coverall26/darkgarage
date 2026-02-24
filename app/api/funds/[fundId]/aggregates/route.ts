@@ -9,6 +9,17 @@ import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
+interface ManualInvestmentRow {
+  id: string;
+  investorId: string;
+  commitmentAmount: { toString(): string };
+  fundedAmount: { toString(): string };
+  documentType: string;
+  documentTitle: string;
+  signedDate: Date | null;
+  status: string;
+}
+
 /**
  * GET /api/funds/[fundId]/aggregates
  *
@@ -82,7 +93,8 @@ export async function GET(
       return NextResponse.json({ error: "Fund not found" }, { status: 404 });
     }
 
-    const manualInvestments = await (prisma as any).manualInvestment.findMany({
+    // ManualInvestment model exists in schema - if Prisma client is stale, run `npx prisma generate`
+    const manualInvestments = await prisma.manualInvestment.findMany({
       where: {
         fundId,
         status: "ACTIVE",
@@ -98,7 +110,7 @@ export async function GET(
       0,
     );
     const manualCommitments = manualInvestments.reduce(
-      (sum: number, mi: any) => sum + Number(mi.commitmentAmount),
+      (sum: number, mi: ManualInvestmentRow) => sum + Number(mi.commitmentAmount),
       0,
     );
     const totalCommitments = platformCommitments + manualCommitments;
@@ -108,7 +120,7 @@ export async function GET(
       0,
     );
     const manualFunded = manualInvestments.reduce(
-      (sum: number, mi: any) => sum + Number(mi.fundedAmount),
+      (sum: number, mi: ManualInvestmentRow) => sum + Number(mi.fundedAmount),
       0,
     );
     const totalFunded = platformFunded + manualFunded;
@@ -141,7 +153,7 @@ export async function GET(
 
     const investorIdsSet = new Set<string>();
     fund.investments.forEach((inv: { investorId: string }) => investorIdsSet.add(inv.investorId));
-    manualInvestments.forEach((mi: any) => investorIdsSet.add(mi.investorId));
+    manualInvestments.forEach((mi: ManualInvestmentRow) => investorIdsSet.add(mi.investorId));
     const totalInvestorCount = investorIdsSet.size;
 
     return NextResponse.json({
@@ -184,7 +196,7 @@ export async function GET(
         funded: inv.fundedAmount.toString(),
         status: inv.status,
       })),
-      manualInvestments: manualInvestments.map((mi: any) => ({
+      manualInvestments: manualInvestments.map((mi: ManualInvestmentRow) => ({
         id: mi.id,
         investorId: mi.investorId,
         documentType: mi.documentType,

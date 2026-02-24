@@ -95,7 +95,7 @@ test: add 17 tests for manual investor entry API
 ### Before Opening a PR
 
 1. **Run the type checker**: `npm run typecheck` (must pass with 0 errors)
-2. **Run tests**: `npm test` (must pass all 5,066+ tests)
+2. **Run tests**: `npm test` (must pass all 5,800+ tests)
 3. **Check for lint errors**: `npm run lint`
 4. **Update documentation** (see Documentation Requirements below)
 
@@ -276,7 +276,7 @@ prisma.newModel = {
 
 1. **`CLAUDE.md` Implementation Status**: Add new features to the appropriate section with file paths and notes
 2. **`CLAUDE.md` Reference Documents**: Add new docs to the reference list if applicable
-3. **`docs/FundRoom_Claude_Code_Handoff.md`**: Add dated changelog entry
+3. **`CHANGELOG.md`**: Add version history entries for releases
 4. **`README.md`**: Update architecture tree and metrics if structure changed
 5. **Domain-specific docs**: Update relevant docs in `/docs/` (database, monitoring, CI/CD, etc.)
 

@@ -5,6 +5,8 @@ import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { KycActionSchema } from "@/lib/validations/lp";
 
 export const dynamic = "force-dynamic";
 
@@ -147,8 +149,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { action } = body;
+    const parsed = await validateBody(req, KycActionSchema);
+    if (parsed.error) return parsed.error;
+    const { action } = parsed.data;
 
     // Get investor details with fund for org_id isolation
     const investor = await prisma.investor.findUnique({

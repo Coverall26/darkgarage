@@ -820,7 +820,7 @@ export async function POST(request: NextRequest) {
         // Send events in the background to avoid blocking the response
         if (newDataroomView) {
           waitUntil(
-            // Record link view in Tinybird
+            // Record link view
             recordLinkView({
               req: request,
               clickId: newId("linkView"),
@@ -960,7 +960,7 @@ export async function POST(request: NextRequest) {
           });
 
           waitUntil(
-            // Record link view in Tinybird
+            // Record link view
             recordLinkView({
               req: request,
               clickId: newId("linkView"),

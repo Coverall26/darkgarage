@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateGP } from "@/lib/marketplace/auth";
 import { reviewProofOfPayment } from "@/lib/wire-transfer";
 import { reportError } from "@/lib/error";
+import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,9 @@ type Params = {
  * GP reviews (verifies or rejects) proof of payment.
  */
 export async function POST(req: NextRequest, { params }: Params) {
+  const blocked = await appRouterRateLimit(req);
+  if (blocked) return blocked;
+
   try {
     const { teamId, investmentId } = await params;
     const auth = await authenticateGP(teamId);

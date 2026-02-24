@@ -5,8 +5,10 @@ import { getServerSession } from "next-auth";
 
 import { getFeatureFlags } from "@/lib/featureFlags";
 import { generateWebhookId } from "@/lib/incoming-webhooks";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { CustomUser } from "@/lib/types";
+import { TokenCreateSchema } from "@/lib/validations/teams";
 import { reportError } from "@/lib/error";
 
 export default async function handle(
@@ -103,10 +105,11 @@ export default async function handle(
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { name } = req.body;
-      if (!name) {
-        return res.status(400).json({ error: "Name is required" });
+      const parsed = validateBodyPagesRouter(req.body, TokenCreateSchema);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
       }
+      const { name } = parsed.data;
 
       // Generate webhook ID and secret
       const webhookId = generateWebhookId(teamId);

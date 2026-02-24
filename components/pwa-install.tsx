@@ -70,7 +70,7 @@ export function PWAInstallPrompt() {
         if (newWorker) {
           newWorker.addEventListener("statechange", () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              console.log("New version available, will activate on next visit");
+              // New version available, will activate on next visit
             }
           });
         }

@@ -273,7 +273,7 @@ describe('Compliance Hooks E2E', () => {
     });
   });
 
-  describe('Tinybird Analytics Integration', () => {
+  describe('Analytics Integration', () => {
     it('should record page view analytics', async () => {
       const analyticsEvent = {
         event: 'page_view',

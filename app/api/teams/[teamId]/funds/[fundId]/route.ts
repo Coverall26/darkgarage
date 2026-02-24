@@ -14,6 +14,8 @@ import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundUpdateSchema } from "@/lib/validations/admin";
 
 
 export const dynamic = "force-dynamic";
@@ -142,15 +144,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Fund not found" }, { status: 404 });
     }
 
-    const body = await req.json();
+    const parsed = await validateBody(req, FundUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
+
     const updateData: Record<string, unknown> = {};
     const previousValues: Record<string, unknown> = {};
 
     // Fund name
     if (body.fundName !== undefined) {
-      if (typeof body.fundName !== "string" || body.fundName.length === 0 || body.fundName.length > 200) {
-        return NextResponse.json({ error: "Fund name must be 1-200 characters" }, { status: 400 });
-      }
       previousValues.name = fund.name;
       updateData.name = body.fundName;
     }
@@ -170,12 +172,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // Target raise
     if (body.targetRaise !== undefined) {
-      const val = parseFloat(body.targetRaise);
-      if (isNaN(val) || val <= 0 || val > 100_000_000_000) {
-        return NextResponse.json({ error: "Target raise must be positive and at most $100B" }, { status: 400 });
-      }
       previousValues.targetRaise = fund.targetRaise?.toNumber();
-      updateData.targetRaise = val;
+      updateData.targetRaise = body.targetRaise;
     }
 
     // Currency
@@ -186,52 +184,32 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // Minimum commitment
     if (body.minimumCommitment !== undefined) {
-      const val = parseFloat(body.minimumCommitment);
-      if (body.minimumCommitment && (isNaN(val) || val < 0 || val > 100_000_000_000)) {
-        return NextResponse.json({ error: "Minimum commitment must be non-negative and at most $100B" }, { status: 400 });
-      }
       previousValues.minimumInvestment = fund.minimumInvestment?.toNumber();
-      updateData.minimumInvestment = body.minimumCommitment ? val : null;
+      updateData.minimumInvestment = body.minimumCommitment ?? null;
     }
 
     // Management fee %
     if (body.managementFeePct !== undefined) {
-      const val = parseFloat(body.managementFeePct);
-      if (body.managementFeePct && (isNaN(val) || val < 0 || val > 10)) {
-        return NextResponse.json({ error: "Management fee must be between 0% and 10%" }, { status: 400 });
-      }
       previousValues.managementFeePct = fund.managementFeePct ? Number(fund.managementFeePct) * 100 : null;
-      updateData.managementFeePct = body.managementFeePct ? val / 100 : null;
+      updateData.managementFeePct = body.managementFeePct != null ? body.managementFeePct / 100 : null;
     }
 
     // Carry %
     if (body.carryPct !== undefined) {
-      const val = parseFloat(body.carryPct);
-      if (body.carryPct && (isNaN(val) || val < 0 || val > 50)) {
-        return NextResponse.json({ error: "Carried interest must be between 0% and 50%" }, { status: 400 });
-      }
       previousValues.carryPct = fund.carryPct ? Number(fund.carryPct) * 100 : null;
-      updateData.carryPct = body.carryPct ? val / 100 : null;
+      updateData.carryPct = body.carryPct != null ? body.carryPct / 100 : null;
     }
 
     // Term years
     if (body.termYears !== undefined) {
-      const val = parseInt(body.termYears);
-      if (body.termYears && (isNaN(val) || val < 1 || val > 40)) {
-        return NextResponse.json({ error: "Fund term must be between 1 and 40 years" }, { status: 400 });
-      }
       previousValues.termYears = fund.termYears;
-      updateData.termYears = body.termYears ? val : null;
+      updateData.termYears = body.termYears ?? null;
     }
 
     // Extension years
     if (body.extensionYears !== undefined) {
-      const val = parseInt(body.extensionYears);
-      if (body.extensionYears && (isNaN(val) || val < 0 || val > 10)) {
-        return NextResponse.json({ error: "Extension must be between 0 and 10 years" }, { status: 400 });
-      }
       previousValues.extensionYears = fund.extensionYears;
-      updateData.extensionYears = body.extensionYears ? val : null;
+      updateData.extensionYears = body.extensionYears ?? null;
     }
 
     // Waterfall type
@@ -245,12 +223,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // Hurdle rate %
     if (body.hurdleRate !== undefined) {
-      const val = parseFloat(body.hurdleRate);
-      if (body.hurdleRate && (isNaN(val) || val < 0 || val > 30)) {
-        return NextResponse.json({ error: "Hurdle rate must be between 0% and 30%" }, { status: 400 });
-      }
       previousValues.hurdleRate = fund.hurdleRate ? Number(fund.hurdleRate) * 100 : null;
-      updateData.hurdleRate = body.hurdleRate ? val / 100 : null;
+      updateData.hurdleRate = body.hurdleRate != null ? body.hurdleRate / 100 : null;
     }
 
     // High-water mark
@@ -261,22 +235,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // GP commitment amount
     if (body.gpCommitmentAmount !== undefined) {
-      const val = parseFloat(body.gpCommitmentAmount);
-      if (body.gpCommitmentAmount && (isNaN(val) || val < 0 || val > 100_000_000_000)) {
-        return NextResponse.json({ error: "GP commitment must be non-negative and at most $100B" }, { status: 400 });
-      }
       previousValues.gpCommitmentAmount = fund.gpCommitmentAmount?.toNumber() ?? null;
-      updateData.gpCommitmentAmount = body.gpCommitmentAmount ? val : null;
+      updateData.gpCommitmentAmount = body.gpCommitmentAmount ?? null;
     }
 
     // GP commitment %
     if (body.gpCommitmentPct !== undefined) {
-      const val = parseFloat(body.gpCommitmentPct);
-      if (body.gpCommitmentPct && (isNaN(val) || val < 0 || val > 100)) {
-        return NextResponse.json({ error: "GP commitment % must be between 0% and 100%" }, { status: 400 });
-      }
       previousValues.gpCommitmentPct = fund.gpCommitmentPct ? Number(fund.gpCommitmentPct) * 100 : null;
-      updateData.gpCommitmentPct = body.gpCommitmentPct ? val / 100 : null;
+      updateData.gpCommitmentPct = body.gpCommitmentPct != null ? body.gpCommitmentPct / 100 : null;
     }
 
     // Advanced provisions
@@ -296,21 +262,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     if (body.noFaultDivorceThreshold !== undefined) {
-      const val = parseFloat(body.noFaultDivorceThreshold);
-      if (body.noFaultDivorceThreshold && (isNaN(val) || val < 0 || val > 100)) {
-        return NextResponse.json({ error: "No-fault divorce threshold must be between 0% and 100%" }, { status: 400 });
-      }
       previousValues.noFaultDivorceThreshold = fund.noFaultDivorceThreshold?.toNumber() ?? null;
-      updateData.noFaultDivorceThreshold = body.noFaultDivorceThreshold ? val : null;
+      updateData.noFaultDivorceThreshold = body.noFaultDivorceThreshold ?? null;
     }
 
     if (body.investmentPeriodYears !== undefined) {
-      const val = parseInt(body.investmentPeriodYears);
-      if (body.investmentPeriodYears && (isNaN(val) || val < 1 || val > 20)) {
-        return NextResponse.json({ error: "Investment period must be between 1 and 20 years" }, { status: 400 });
-      }
       previousValues.investmentPeriodYears = fund.investmentPeriodYears;
-      updateData.investmentPeriodYears = body.investmentPeriodYears ? val : null;
+      updateData.investmentPeriodYears = body.investmentPeriodYears ?? null;
     }
 
     if (body.preferredReturnMethod !== undefined) {
@@ -327,12 +285,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     if (body.mgmtFeeOffsetPct !== undefined) {
-      const val = parseFloat(body.mgmtFeeOffsetPct);
-      if (body.mgmtFeeOffsetPct && (isNaN(val) || val < 0 || val > 100)) {
-        return NextResponse.json({ error: "Management fee offset must be between 0% and 100%" }, { status: 400 });
-      }
       previousValues.mgmtFeeOffsetPct = fund.mgmtFeeOffsetPct?.toNumber() ?? null;
-      updateData.mgmtFeeOffsetPct = body.mgmtFeeOffsetPct ? val : null;
+      updateData.mgmtFeeOffsetPct = body.mgmtFeeOffsetPct ?? null;
     }
 
     // Regulation D

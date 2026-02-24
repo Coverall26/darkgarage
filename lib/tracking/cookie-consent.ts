@@ -7,7 +7,7 @@
  *
  * Categories:
  * - necessary: Always allowed (auth, CSRF, session)
- * - analytics: Tinybird, PostHog page/event tracking
+ * - analytics: PostHog page/event tracking
  * - marketing: UTM attribution, referrer tracking
  * - preferences: UI state cookies (sidebar, banner dismissals)
  */

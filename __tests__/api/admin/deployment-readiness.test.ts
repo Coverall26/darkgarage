@@ -313,14 +313,14 @@ describe("GET /api/admin/deployment-readiness", () => {
   });
 
   it("treats optional env vars as warn when missing", async () => {
-    delete process.env.TINYBIRD_TOKEN;
+    delete process.env.POSTHOG_SERVER_KEY;
     const { req, res } = createReq();
     await handler(req, res);
     const data = JSON.parse(res._getData());
-    const tbCheck = data.checks.find(
-      (c: { name: string }) => c.name === "TINYBIRD_TOKEN",
+    const phCheck = data.checks.find(
+      (c: { name: string }) => c.name === "POSTHOG_SERVER_KEY",
     );
-    expect(tbCheck.status).toBe("warn");
+    expect(phCheck.status).toBe("warn");
   });
 
   it("reports platform data status", async () => {
@@ -385,7 +385,7 @@ describe("GET /api/admin/deployment-readiness", () => {
     process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_token";
     process.env.ROLLBAR_SERVER_TOKEN = "rollbar_server";
     process.env.NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN = "rollbar_client";
-    process.env.TINYBIRD_TOKEN = "tinybird_token";
+    process.env.POSTHOG_SERVER_KEY = "phx_server_key";
     process.env.DOCUMENT_ENCRYPTION_SALT = "a".repeat(64);
     process.env.MASTER_ENCRYPTION_KEY = "b".repeat(64);
     process.env.HKDF_STORAGE_SALT = "c".repeat(64);

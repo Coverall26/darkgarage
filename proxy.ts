@@ -1,6 +1,27 @@
+/**
+ * proxy.ts — FundRoom Edge Middleware (Single Entry Point)
+ *
+ * IMPORTANT: This file MUST be named `proxy.ts`, NOT `middleware.ts`.
+ * Next.js 16.1.6+ auto-detects `proxy.ts` as the middleware entry point.
+ * Creating a `middleware.ts` alongside it causes a fatal startup error:
+ *   "Both middleware file and proxy file detected."
+ * See SESSION_SUMMARY_FEB14_2026.md for the full incident report.
+ *
+ * This middleware handles ALL incoming requests:
+ *   1. API routes (/api/*): Rate limiting → CSRF → Edge Auth → Route handler
+ *   2. Admin pages (/admin/*): JWT + role enforcement → AppMiddleware
+ *   3. Custom domains: DomainMiddleware routing
+ *   4. Public pages: CSP + tracking cookies
+ *
+ * Pages Router is deprecated — App Router only for all new development.
+ */
+
 import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 
-import { enforceAdminAuth, applyAdminAuthHeaders } from "@/lib/middleware/admin-auth";
+import { enforceAdminAuth } from "@/lib/middleware/admin-auth";
+import { chain, MiddlewareFn } from "@/lib/middleware/chain";
+import { enforceEdgeAuth, applyEdgeAuthHeaders } from "@/lib/middleware/edge-auth";
+import { RouteCategory } from "@/lib/middleware/route-config";
 import { validateCSRFEdge } from "@/lib/security/csrf";
 import AppMiddleware from "@/lib/middleware/app";
 import { handleCorsPreflightRequest, setCorsHeaders } from "@/lib/middleware/cors";
@@ -23,31 +44,31 @@ function isAnalyticsPath(path: string): boolean {
 
 function validateHost(host: string | null): boolean {
   if (!host) return false;
-  
+
   const hostPattern = /^[a-zA-Z0-9][a-zA-Z0-9\-\.]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
   const cleanHost = host.split(':')[0];
-  
+
   if (cleanHost.length > 253) return false;
   if (!hostPattern.test(cleanHost)) return false;
-  
+
   return true;
 }
 
 function validateClientIP(req: NextRequest): string | null {
   const forwardedFor = req.headers.get("x-forwarded-for");
   const realIP = req.headers.get("x-real-ip");
-  
+
   const ip = forwardedFor?.split(',')[0]?.trim() || realIP || null;
-  
+
   if (ip) {
     const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
     const ipv6Pattern = /^([a-fA-F0-9:]+)$/;
-    
+
     if (!ipv4Pattern.test(ip) && !ipv6Pattern.test(ip)) {
       return null;
     }
   }
-  
+
   return ip;
 }
 
@@ -141,7 +162,11 @@ const RATE_LIMIT_EXEMPT_PATHS = [
 
 const blanketLimiter = ratelimit(200, "60 s");
 
-async function applyBlanketRateLimit(req: NextRequest): Promise<NextResponse | null> {
+/**
+ * API middleware step 1: Blanket rate limiting (200 req/min/IP).
+ * Fails open if Redis is unavailable.
+ */
+const rateLimitMiddleware: MiddlewareFn = async (req) => {
   const path = req.nextUrl.pathname;
 
   // Skip exempt paths (health checks, webhooks, cron jobs)
@@ -158,7 +183,7 @@ async function applyBlanketRateLimit(req: NextRequest): Promise<NextResponse | n
 
     if (!result.success) {
       const retryAfter = Math.ceil((result.reset - Date.now()) / 1000);
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Too many requests" },
         {
           status: 429,
@@ -169,6 +194,8 @@ async function applyBlanketRateLimit(req: NextRequest): Promise<NextResponse | n
           },
         },
       );
+      setCorsHeaders(req, response);
+      return response;
     }
 
     return null; // Allowed
@@ -176,7 +203,64 @@ async function applyBlanketRateLimit(req: NextRequest): Promise<NextResponse | n
     // Fail open — if Redis is unavailable, allow the request
     return null;
   }
-}
+};
+
+/**
+ * API middleware step 2: CSRF protection.
+ * Validates Origin/Referer on state-changing requests (POST, PUT, PATCH, DELETE).
+ * Safe methods (GET, HEAD, OPTIONS) and exempt paths pass through.
+ */
+const csrfMiddleware: MiddlewareFn = (req) => {
+  const csrfResponse = validateCSRFEdge(req);
+  if (csrfResponse) {
+    const csrfNextResponse = new NextResponse(csrfResponse.body, {
+      status: csrfResponse.status,
+      headers: csrfResponse.headers,
+    });
+    setCorsHeaders(req, csrfNextResponse);
+    return csrfNextResponse;
+  }
+  return null;
+};
+
+/**
+ * API middleware step 3: Edge auth + header injection.
+ * Classifies each route (PUBLIC/CRON/AUTHENTICATED/TEAM_SCOPED/ADMIN)
+ * and enforces appropriate auth at the edge. On success, injects user
+ * context headers and returns the final response with CORS.
+ *
+ * This is a terminal middleware — it always returns a response (either
+ * a 401/403 block or NextResponse.next() with headers).
+ */
+const authAndFinalizeMiddleware: MiddlewareFn = async (req) => {
+  const authResult = await enforceEdgeAuth(req);
+  if (authResult.blocked && authResult.response) {
+    setCorsHeaders(req, authResult.response);
+    return authResult.response;
+  }
+
+  // Build the final pass-through response with user context + CORS headers
+  const response = NextResponse.next();
+
+  // Generate request ID for tracing
+  response.headers.set("x-request-id", crypto.randomUUID());
+
+  // Inject user context headers for authenticated routes
+  if (authResult.category !== RouteCategory.PUBLIC && authResult.category !== RouteCategory.CRON) {
+    applyEdgeAuthHeaders(response, authResult);
+  }
+  setCorsHeaders(req, response);
+  return response;
+};
+
+// ---------------------------------------------------------------------------
+// API middleware chain — executed in order for all /api/* routes
+// ---------------------------------------------------------------------------
+const apiMiddlewares: MiddlewareFn[] = [
+  rateLimitMiddleware,
+  csrfMiddleware,
+  authAndFinalizeMiddleware,
+];
 
 export const config = {
   matcher: [
@@ -193,58 +277,20 @@ export default async function proxy(req: NextRequest, ev: NextFetchEvent) {
       return createErrorResponse("Invalid host header", 400);
     }
 
-    // Handle CORS for API routes: preflight OPTIONS and response headers
+    // ---------------------------------------------------------------
+    // API routes — handled by middleware chain
+    // ---------------------------------------------------------------
     if (path.startsWith("/api/")) {
+      // Handle CORS preflight separately (must return before chain)
       const preflightResponse = handleCorsPreflightRequest(req);
       if (preflightResponse) return preflightResponse;
 
-      // Blanket rate limiting — 200 req/min per IP (safety net)
-      // Individual route limiters are tighter and take precedence.
-      const rateLimitResponse = await applyBlanketRateLimit(req);
-      if (rateLimitResponse) {
-        setCorsHeaders(req, rateLimitResponse);
-        return rateLimitResponse;
-      }
-
-      // ---------------------------------------------------------------
-      // CSRF protection — validates Origin/Referer on state-changing
-      // requests (POST, PUT, PATCH, DELETE). Safe methods (GET, HEAD,
-      // OPTIONS) and exempt paths (webhooks, auth, health) pass through.
-      // ---------------------------------------------------------------
-      const csrfResponse = validateCSRFEdge(req);
-      if (csrfResponse) {
-        const csrfNextResponse = new NextResponse(csrfResponse.body, {
-          status: csrfResponse.status,
-          headers: csrfResponse.headers,
-        });
-        setCorsHeaders(req, csrfNextResponse);
-        return csrfNextResponse;
-      }
-
-      // ---------------------------------------------------------------
-      // Admin API auth enforcement — defense-in-depth layer
-      // Validates JWT session + blocks LP users at the edge BEFORE
-      // requests reach route handlers. Route handlers still perform
-      // their own RBAC checks for team-specific authorization.
-      // ---------------------------------------------------------------
-      if (path.startsWith("/api/admin/")) {
-        const adminAuth = await enforceAdminAuth(req);
-        if (adminAuth.blocked && adminAuth.response) {
-          setCorsHeaders(req, adminAuth.response);
-          return adminAuth.response;
-        }
-        // Pass user context headers downstream for defense-in-depth
-        const response = NextResponse.next();
-        applyAdminAuthHeaders(response, adminAuth);
-        setCorsHeaders(req, response);
-        return response;
-      }
-
-      // For non-preflight, non-admin API requests, set CORS headers on the response
-      const response = NextResponse.next();
-      setCorsHeaders(req, response);
-      return response;
+      return chain(req, apiMiddlewares);
     }
+
+    // ---------------------------------------------------------------
+    // Page routes — handled by existing middleware stack
+    // ---------------------------------------------------------------
 
     // Redirect legacy /org-setup to canonical /admin/setup
     if (path === "/org-setup" || path.startsWith("/org-setup/")) {
@@ -277,13 +323,7 @@ export default async function proxy(req: NextRequest, ev: NextFetchEvent) {
       return withTracking(wrapResponseWithCSP(req, response));
     }
 
-    // ---------------------------------------------------------------
     // Admin page auth enforcement — defense-in-depth layer
-    // Blocks unauthenticated and LP users from /admin/* pages at the
-    // edge, before they reach AppMiddleware or page rendering.
-    // This supplements the AppMiddleware auth checks with an earlier
-    // interception point for admin-specific routes.
-    // ---------------------------------------------------------------
     if (path.startsWith("/admin/") || path === "/admin") {
       const adminAuth = await enforceAdminAuth(req);
       if (adminAuth.blocked && adminAuth.response) {
@@ -326,7 +366,7 @@ export default async function proxy(req: NextRequest, ev: NextFetchEvent) {
       host: req.headers.get("host"),
     });
     console.error("[Proxy Error]", error instanceof Error ? error.message : "Unknown error");
-    
+
     return createErrorResponse("Internal server error", 500);
   }
 }

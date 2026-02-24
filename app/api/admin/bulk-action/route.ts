@@ -182,6 +182,7 @@ export async function POST(req: NextRequest) {
       const capitalCall = await prisma.capitalCall.create({
         data: {
           fundId,
+          teamId: fund.teamId,
           callNumber: callNumber + 1,
           amount: amount,
           purpose: `Capital Call #${callNumber + 1}`,
@@ -215,6 +216,7 @@ export async function POST(req: NextRequest) {
       const distribution = await prisma.distribution.create({
         data: {
           fundId,
+          teamId: fund.teamId,
           distributionNumber: distNumber + 1,
           totalAmount: amount,
           distributionType: "DIVIDEND",

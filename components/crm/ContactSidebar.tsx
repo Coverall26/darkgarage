@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { formatDistanceToNow, format, isPast, isToday } from "date-fns";
+import { toast } from "sonner";
 import { reportError } from "@/lib/error";
 import {
   X,
@@ -267,6 +268,15 @@ export function ContactSidebar({
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editFields, setEditFields] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    company: "",
+    title: "",
+    phone: "",
+  });
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [showAllActivities, setShowAllActivities] = useState(false);
@@ -306,15 +316,21 @@ export function ContactSidebar({
     if (!contact || !noteText.trim()) return;
     setSavingNote(true);
     try {
-      await fetch(`/api/contacts/${contact.id}/notes`, {
+      const res = await fetch(`/api/contacts/${contact.id}/notes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: noteText }),
       });
-      setNoteText("");
-      fetchContact();
+      if (res.ok) {
+        toast.success("Note saved");
+        setNoteText("");
+        fetchContact();
+      } else {
+        toast.error("Failed to save note");
+      }
     } catch (error) {
       reportError(error as Error);
+      toast.error("Failed to save note");
     } finally {
       setSavingNote(false);
     }
@@ -330,15 +346,21 @@ export function ContactSidebar({
       return;
     }
     try {
-      await fetch(`/api/contacts/${contact.id}`, {
+      const res = await fetch(`/api/contacts/${contact.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tags: [...existingTags, newTag] }),
       });
-      setTagInput("");
-      fetchContact();
+      if (res.ok) {
+        toast.success(`Tag "${newTag}" added`);
+        setTagInput("");
+        fetchContact();
+      } else {
+        toast.error("Failed to add tag");
+      }
     } catch (error) {
       reportError(error as Error);
+      toast.error("Failed to add tag");
     }
   };
 
@@ -348,14 +370,20 @@ export function ContactSidebar({
     const existingTags: string[] = (contact.tags as string[]) || [];
     const updatedTags = existingTags.filter((t) => t !== tagToRemove);
     try {
-      await fetch(`/api/contacts/${contact.id}`, {
+      const res = await fetch(`/api/contacts/${contact.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tags: updatedTags }),
       });
-      fetchContact();
+      if (res.ok) {
+        toast.success(`Tag "${tagToRemove}" removed`);
+        fetchContact();
+      } else {
+        toast.error("Failed to remove tag");
+      }
     } catch (error) {
       reportError(error as Error);
+      toast.error("Failed to remove tag");
     }
   };
 
@@ -363,16 +391,69 @@ export function ContactSidebar({
   const handleSetFollowUp = async (dateStr: string | null) => {
     if (!contact || !canContribute) return;
     try {
-      await fetch(`/api/contacts/${contact.id}/follow-up`, {
+      const res = await fetch(`/api/contacts/${contact.id}/follow-up`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nextFollowUpAt: dateStr }),
       });
-      setShowFollowUpPicker(false);
-      setFollowUpDate("");
-      fetchContact();
+      if (res.ok) {
+        toast.success(dateStr ? "Follow-up scheduled" : "Follow-up cleared");
+        setShowFollowUpPicker(false);
+        setFollowUpDate("");
+        fetchContact();
+      } else {
+        toast.error("Failed to update follow-up");
+      }
     } catch (error) {
       reportError(error as Error);
+      toast.error("Failed to update follow-up");
+    }
+  };
+
+  // Enter edit mode — populate fields from current contact
+  const enterEditMode = () => {
+    if (!contact) return;
+    setEditFields({
+      firstName: contact.firstName || "",
+      lastName: contact.lastName || "",
+      email: contact.email || "",
+      company: contact.company || "",
+      title: contact.title || "",
+      phone: contact.phone || "",
+    });
+    setEditMode(true);
+  };
+
+  // Save edited contact
+  const handleSaveEdit = async () => {
+    if (!contact) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/contacts/${contact.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: editFields.firstName || null,
+          lastName: editFields.lastName || null,
+          email: editFields.email,
+          company: editFields.company || null,
+          title: editFields.title || null,
+          phone: editFields.phone || null,
+        }),
+      });
+      if (res.ok) {
+        toast.success("Contact updated");
+        setEditMode(false);
+        fetchContact();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to update contact");
+      }
+    } catch (error) {
+      reportError(error as Error);
+      toast.error("Failed to update contact");
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -435,23 +516,97 @@ export function ContactSidebar({
                     <p className="text-xs text-muted-foreground">{contact.title}</p>
                   )}
                 </div>
-                {canContribute && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditMode(!editMode)} aria-label="Edit contact">
+                {canContribute && !editMode && (
+                  <Button variant="ghost" size="sm" onClick={enterEditMode} aria-label="Edit contact">
                     <Pencil className="h-4 w-4" />
                   </Button>
                 )}
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <a href={`mailto:${contact.email}`} className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-                  {contact.email}
-                </a>
-                {contact.phone && (
-                  <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Phone className="h-3 w-3" aria-hidden="true" /> {contact.phone}
-                  </span>
-                )}
-              </div>
+              {/* Inline Edit Form */}
+              {editMode ? (
+                <div className="mt-3 space-y-3 rounded-md border border-border bg-muted/30 p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground">First Name</label>
+                      <Input
+                        value={editFields.firstName}
+                        onChange={(e) => setEditFields((f) => ({ ...f, firstName: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="First name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Last Name</label>
+                      <Input
+                        value={editFields.lastName}
+                        onChange={(e) => setEditFields((f) => ({ ...f, lastName: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Last name"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Email</label>
+                    <Input
+                      type="email"
+                      value={editFields.email}
+                      onChange={(e) => setEditFields((f) => ({ ...f, email: e.target.value }))}
+                      className="h-8 text-sm"
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Company</label>
+                      <Input
+                        value={editFields.company}
+                        onChange={(e) => setEditFields((f) => ({ ...f, company: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Company"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Title</label>
+                      <Input
+                        value={editFields.title}
+                        onChange={(e) => setEditFields((f) => ({ ...f, title: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder="Title"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Phone</label>
+                    <Input
+                      type="tel"
+                      value={editFields.phone}
+                      onChange={(e) => setEditFields((f) => ({ ...f, phone: e.target.value }))}
+                      className="h-8 text-sm"
+                      placeholder="+1-555-0100"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleSaveEdit} disabled={editSaving || !editFields.email.trim()}>
+                      {editSaving ? "Saving..." : "Save"}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setEditMode(false)} disabled={editSaving}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <a href={`mailto:${contact.email}`} className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+                    {contact.email}
+                  </a>
+                  {contact.phone && (
+                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Phone className="h-3 w-3" aria-hidden="true" /> {contact.phone}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Status dropdown */}
               <div className="mt-3">

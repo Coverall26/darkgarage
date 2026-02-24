@@ -1,7 +1,9 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import prisma from "@/lib/prisma";
-import { getUserWithRole } from "@/lib/auth/with-role";
+import { getUserWithRole, AuthenticatedUser } from "@/lib/auth/with-role";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { TransactionInitiateSchema } from "@/lib/validations/teams";
 
 // AML screening thresholds and rules
 const AML_THRESHOLDS = {
@@ -19,11 +21,11 @@ interface AmlScreeningResult {
 }
 
 async function performAmlScreening(
-  investor: any,
+  investor: { id: string; fundId: string | null; userId: string | null },
   amount: string | number,
   type: string,
   req: NextApiRequest,
-  user: any
+  user: AuthenticatedUser
 ): Promise<AmlScreeningResult> {
   const amountNum = typeof amount === "string" ? parseFloat(amount) : amount;
   const flags: string[] = [];
@@ -45,8 +47,8 @@ async function performAmlScreening(
     },
     select: { amount: true, createdAt: true },
   });
-  
-  const dailyTotal = recentTransactions.reduce((sum: number, t: any) => sum + Number(t.amount), 0) + amountNum;
+
+  const dailyTotal = recentTransactions.reduce((sum: number, t: { amount: { toNumber?: () => number }; createdAt: Date }) => sum + Number(t.amount), 0) + amountNum;
   
   if (dailyTotal > AML_THRESHOLDS.DAILY_CUMULATIVE_LIMIT) {
     flags.push("DAILY_LIMIT_EXCEEDED");
@@ -63,7 +65,7 @@ async function performAmlScreening(
   await prisma.auditLog.create({
     data: {
       eventType: "AML_SCREENING",
-      userId: user.userId,
+      userId: user.id,
       resourceType: "TRANSACTION",
       resourceId: investor.id,
       ipAddress: (req.headers["x-forwarded-for"] as string)?.split(",")[0] || "",
@@ -121,7 +123,7 @@ export default async function handler(
   return res.status(405).json({ error: "Method not allowed" });
 }
 
-async function handleGet(req: NextApiRequest, res: NextApiResponse, user: any) {
+async function handleGet(req: NextApiRequest, res: NextApiResponse, user: AuthenticatedUser) {
   try {
     const { 
       limit = "25", 
@@ -142,7 +144,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, user: any) {
       return res.status(200).json({ transactions: [], total: 0, hasMore: false });
     }
 
-    let where: any = { fundId: { in: allowedFundIds } };
+    let where: Record<string, unknown> = { fundId: { in: allowedFundIds } };
 
     if (fundId && typeof fundId === "string" && allowedFundIds.includes(fundId)) {
       where.fundId = fundId;
@@ -196,7 +198,7 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, user: any) {
     });
 
     return res.status(200).json({
-      transactions: transactions.map((t: any) => ({
+      transactions: transactions.map((t) => ({
         id: t.id,
         type: t.type,
         direction: t.type === "CAPITAL_CALL" ? "inbound" : "outbound",
@@ -232,26 +234,22 @@ async function handleGet(req: NextApiRequest, res: NextApiResponse, user: any) {
   }
 }
 
-async function handlePost(req: NextApiRequest, res: NextApiResponse, user: any) {
+async function handlePost(req: NextApiRequest, res: NextApiResponse, user: AuthenticatedUser) {
   try {
-    const { 
-      type, 
-      investorId, 
-      fundId, 
-      amount, 
-      description, 
-      capitalCallId, 
+    const parsed = validateBodyPagesRouter(req.body, TransactionInitiateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
+    const {
+      type,
+      investorId,
+      fundId,
+      amount,
+      description,
+      capitalCallId,
       distributionId,
-      bankLinkId 
-    } = req.body;
-
-    if (!type || !["CAPITAL_CALL", "DISTRIBUTION"].includes(type)) {
-      return res.status(400).json({ error: "Invalid transaction type" });
-    }
-
-    if (!investorId || !fundId || !amount) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+      bankLinkId
+    } = parsed.data;
 
     const teamFunds = await prisma.fund.findMany({
       where: { teamId: { in: user.teamIds } },
@@ -276,7 +274,7 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, user: any) 
       await prisma.auditLog.create({
         data: {
           eventType: "TRANSACTION_BLOCKED_KYC",
-          userId: user.userId,
+          userId: user.id,
           resourceType: "INVESTOR",
           resourceId: investorId,
           ipAddress: (req.headers["x-forwarded-for"] as string)?.split(",")[0] || "",
@@ -302,30 +300,37 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse, user: any) 
       });
     }
 
-    const bankLink = bankLinkId 
-      ? investor.bankLinks.find((bl: any) => bl.id === bankLinkId)
+    const bankLink = bankLinkId
+      ? investor.bankLinks.find((bl: { id: string }) => bl.id === bankLinkId)
       : investor.bankLinks[0];
+
+    // Resolve teamId from fund for multi-tenant defense-in-depth
+    const fundForTeam = await prisma.fund.findUnique({
+      where: { id: fundId },
+      select: { teamId: true },
+    });
 
     const transaction = await prisma.transaction.create({
       data: {
         investorId,
         bankLinkId: bankLink?.id,
         type,
-        amount: parseFloat(amount),
+        amount: amount,
         currency: "USD",
         description: description || (type === "CAPITAL_CALL" ? "Capital Call" : "Distribution"),
         capitalCallId,
         distributionId,
         fundId,
+        teamId: fundForTeam?.teamId || undefined,
         transferType: type === "CAPITAL_CALL" ? "ach_debit" : "ach_credit",
         status: "PENDING",
-        initiatedBy: user.userId,
+        initiatedBy: user.id,
         ipAddress: req.headers["x-forwarded-for"]?.toString().split(",")[0] || req.socket?.remoteAddress,
         userAgent: req.headers["user-agent"],
         auditTrail: [{
           action: "INITIATED",
           timestamp: new Date().toISOString(),
-          userId: user.userId,
+          userId: user.id,
           details: { type, amount, fundId },
         }],
       },

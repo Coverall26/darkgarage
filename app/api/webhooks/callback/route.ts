@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { verifyQstashSignature } from "@/lib/cron/verify-qstash";
 import prisma from "@/lib/prisma";
-import { recordWebhookEvent } from "@/lib/tinybird/publish";
 import { getSearchParams } from "@/lib/utils/get-search-params";
 import { WEBHOOK_TRIGGERS } from "@/lib/webhook/constants";
 import {
@@ -46,16 +45,16 @@ export const POST = async (req: Request) => {
   const response = Buffer.from(body, "base64").toString("utf-8");
   const isFailed = status >= 400 || status === -1;
 
-  await recordWebhookEvent({
-    url,
-    event,
-    event_id: eventId,
-    http_status: status === -1 ? 503 : status,
-    webhook_id: webhookId || "",
-    request_body: request,
-    response_body: response,
-    message_id: sourceMessageId,
-  });
+  // Log webhook delivery result
+  if (isFailed) {
+    console.error("Webhook delivery failed", {
+      webhookId,
+      eventId,
+      event,
+      status,
+      url,
+    });
+  }
 
   return new Response(`Webhook ${webhookId} processed`);
 };

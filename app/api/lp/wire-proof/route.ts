@@ -11,6 +11,8 @@ import { sendGpWireProofNotification } from "@/lib/emails/send-gp-wire-proof-not
 import { publishServerEvent } from "@/lib/tracking/server-events";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
 import { emitSSE, SSE_EVENTS } from "@/lib/sse/event-emitter";
+import { validateBody } from "@/lib/middleware/validate";
+import { WireProofSchema } from "@/lib/validations/wire";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,8 @@ export async function POST(req: NextRequest) {
 
   try {
 
-    const body = await req.json();
+    const parsed = await validateBody(req, WireProofSchema);
+    if (parsed.error) return parsed.error;
     const {
       investmentId,
       storageKey,
@@ -44,56 +47,7 @@ export async function POST(req: NextRequest) {
       amountSent,
       wireDateInitiated,
       bankReference,
-    } = body;
-
-    if (!investmentId || !storageKey || !storageType || !fileType || !fileName) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 },
-      );
-    }
-
-    // Validate optional field bounds
-    if (notes && typeof notes === "string" && notes.length > 500) {
-      return NextResponse.json(
-        { error: "Notes exceeds 500 characters" },
-        { status: 400 },
-      );
-    }
-    if (
-      bankReference &&
-      typeof bankReference === "string" &&
-      bankReference.length > 100
-    ) {
-      return NextResponse.json(
-        { error: "Bank reference exceeds 100 characters" },
-        { status: 400 },
-      );
-    }
-    if (
-      amountSent != null &&
-      (typeof amountSent !== "number" ||
-        !Number.isFinite(amountSent) ||
-        amountSent < 0 ||
-        amountSent > 100_000_000_000)
-    ) {
-      return NextResponse.json(
-        { error: "Invalid amountSent" },
-        { status: 400 },
-      );
-    }
-    if (wireDateInitiated) {
-      const wireDate = new Date(wireDateInitiated);
-      if (
-        isNaN(wireDate.getTime()) ||
-        wireDate.getTime() > Date.now() + 86400000
-      ) {
-        return NextResponse.json(
-          { error: "Invalid or future wireDateInitiated" },
-          { status: 400 },
-        );
-      }
-    }
+    } = parsed.data;
 
     // Try ManualInvestment first (GP-initiated flow)
     const manualInvestment = await prisma.manualInvestment.findUnique({
@@ -190,6 +144,7 @@ export async function POST(req: NextRequest) {
       data: {
         investorId: investment.investorId,
         fundId: investment.fundId,
+        teamId: investment.fund?.teamId || undefined,
         type: "WIRE_TRANSFER",
         amount: investment.commitmentAmount,
         status: "PROOF_UPLOADED",

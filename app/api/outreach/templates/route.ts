@@ -13,6 +13,8 @@ import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { resolveOrgTier } from "@/lib/tier/crm-tier";
 import { resolveCrmRole, hasCrmPermission } from "@/lib/auth/crm-roles";
+import { validateBody } from "@/lib/middleware/validate";
+import { OutreachTemplateUpdateSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -124,43 +126,27 @@ export async function POST(req: NextRequest) {
 
     const orgId = userTeam.team.organizationId;
 
-    const body = await req.json();
-    const { name, subject, body: templateBody, category } = body;
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, OutreachTemplateUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const { name, subject, body: templateBody, category } = parsed.data;
 
-    // Validate
-    if (!name || typeof name !== "string" || !name.trim()) {
+    // Enforce required fields for creation
+    if (!name || !name.trim()) {
       return NextResponse.json(
         { error: "Template name is required" },
         { status: 400 },
       );
     }
-    if (name.length > 100) {
-      return NextResponse.json(
-        { error: "Template name too long (max 100 chars)" },
-        { status: 400 },
-      );
-    }
-    if (!subject || typeof subject !== "string" || !subject.trim()) {
+    if (!subject || !subject.trim()) {
       return NextResponse.json(
         { error: "Subject line is required" },
         { status: 400 },
       );
     }
-    if (subject.length > 500) {
-      return NextResponse.json(
-        { error: "Subject too long (max 500 chars)" },
-        { status: 400 },
-      );
-    }
-    if (!templateBody || typeof templateBody !== "string" || !templateBody.trim()) {
+    if (!templateBody || !templateBody.trim()) {
       return NextResponse.json(
         { error: "Template body is required" },
-        { status: 400 },
-      );
-    }
-    if (templateBody.length > 50_000) {
-      return NextResponse.json(
-        { error: "Template body too long (max 50,000 chars)" },
         { status: 400 },
       );
     }

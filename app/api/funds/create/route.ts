@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { requireAuthAppRouter } from "@/lib/auth/rbac";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { FundCreateSchema } from "@/lib/validations/admin";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,69 +13,52 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const body = await req.json();
+    const parsed = await validateBody(req, FundCreateSchema);
+    if (parsed.error) return parsed.error;
     const {
       name,
+      teamId,
       description,
       entityMode,
       style,
+      fundSubType,
       targetRaise,
       minimumInvestment,
       aumTarget,
-      callFrequency,
-      thresholdEnabled,
-      thresholdAmount,
-      stagedCommitmentsEnabled,
-      teamId,
-      fundSubType,
+      currency,
       managementFeePct,
       carryPct,
       hurdleRate,
-      waterfallType,
-      termYears,
-      extensionYears,
-      highWaterMark,
       gpCommitmentAmount,
       gpCommitmentPct,
+      mgmtFeeOffsetPct,
+      waterfallType,
+      preferredReturnMethod,
+      termYears,
+      extensionYears,
+      investmentPeriodYears,
+      callFrequency,
+      highWaterMark,
       recyclingEnabled,
       keyPersonEnabled,
       keyPersonName,
-      noFaultDivorceThreshold,
-      investmentPeriodYears,
-      preferredReturnMethod,
       clawbackProvision,
-      mgmtFeeOffsetPct,
-      regulationDExemption,
+      stagedCommitmentsEnabled,
+      thresholdEnabled,
+      thresholdAmount,
+      noFaultDivorceThreshold,
       marketplaceInterest,
       marketplaceDescription,
       marketplaceCategory,
+      featureFlags,
       wireInstructions,
-      currency,
-    } = body;
-
-    if (!name || !targetRaise || !minimumInvestment || !teamId) {
-      return NextResponse.json(
-        { error: "Missing required fields: name, targetRaise, minimumInvestment, teamId" },
-        { status: 400 }
-      );
-    }
-
-    const parsedTargetRaise = parseFloat(targetRaise);
-    const parsedMinimumInvestment = parseFloat(minimumInvestment);
-
-    if (isNaN(parsedTargetRaise) || parsedTargetRaise <= 0 || parsedTargetRaise > 100_000_000_000) {
-      return NextResponse.json(
-        { error: "targetRaise must be a positive number up to $100B" },
-        { status: 400 }
-      );
-    }
-
-    if (isNaN(parsedMinimumInvestment) || parsedMinimumInvestment <= 0 || parsedMinimumInvestment > parsedTargetRaise) {
-      return NextResponse.json(
-        { error: "minimumInvestment must be a positive number not exceeding targetRaise" },
-        { status: 400 }
-      );
-    }
+      useOfProceeds,
+      salesCommissions,
+      fundStrategy,
+      instrumentType,
+      regulationDExemption,
+      investmentCompanyExemption,
+    } = parsed.data;
 
     const team = await prisma.team.findFirst({
       where: {
@@ -93,64 +79,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate entityMode if provided
-    const validEntityModes = ["FUND", "STARTUP"];
-    const resolvedEntityMode = entityMode && validEntityModes.includes(entityMode) ? entityMode : "FUND";
-
-    // Validate fund economics fields (only for FUND mode, all optional)
-    const parsedManagementFee = managementFeePct ? parseFloat(managementFeePct) : null;
-    if (parsedManagementFee !== null && (isNaN(parsedManagementFee) || parsedManagementFee < 0 || parsedManagementFee > 10)) {
-      return NextResponse.json(
-        { error: "managementFeePct must be between 0 and 10 (percent)" },
-        { status: 400 }
-      );
-    }
-
-    const parsedCarry = carryPct ? parseFloat(carryPct) : null;
-    if (parsedCarry !== null && (isNaN(parsedCarry) || parsedCarry < 0 || parsedCarry > 50)) {
-      return NextResponse.json(
-        { error: "carryPct must be between 0 and 50 (percent)" },
-        { status: 400 }
-      );
-    }
-
-    const parsedHurdle = hurdleRate ? parseFloat(hurdleRate) : null;
-    if (parsedHurdle !== null && (isNaN(parsedHurdle) || parsedHurdle < 0 || parsedHurdle > 20)) {
-      return NextResponse.json(
-        { error: "hurdleRate must be between 0 and 20 (percent)" },
-        { status: 400 }
-      );
-    }
-
-    const validWaterfallTypes = ["EUROPEAN", "AMERICAN", "DEAL_BY_DEAL"];
-    if (waterfallType && !validWaterfallTypes.includes(waterfallType)) {
-      return NextResponse.json(
-        { error: "waterfallType must be one of: EUROPEAN, AMERICAN, DEAL_BY_DEAL" },
-        { status: 400 }
-      );
-    }
-
-    const parsedTermYears = termYears ? parseInt(termYears) : null;
-    if (parsedTermYears !== null && (isNaN(parsedTermYears) || parsedTermYears < 1 || parsedTermYears > 30)) {
-      return NextResponse.json(
-        { error: "termYears must be an integer between 1 and 30" },
-        { status: 400 }
-      );
-    }
-
-    const parsedExtensionYears = extensionYears ? parseInt(extensionYears) : null;
-    if (parsedExtensionYears !== null && (isNaN(parsedExtensionYears) || parsedExtensionYears < 0 || parsedExtensionYears > 5)) {
-      return NextResponse.json(
-        { error: "extensionYears must be an integer between 0 and 5" },
-        { status: 400 }
-      );
-    }
-
-    // Validate and parse new fund fields
-    const parsedGpCommitment = gpCommitmentAmount ? parseFloat(gpCommitmentAmount) : null;
-    const parsedGpCommitmentPct = gpCommitmentPct ? parseFloat(gpCommitmentPct) : null;
-    const parsedNoFaultThreshold = noFaultDivorceThreshold ? parseFloat(noFaultDivorceThreshold) : null;
-    const parsedInvestmentPeriod = investmentPeriodYears ? parseInt(investmentPeriodYears) : null;
+    const resolvedEntityMode = entityMode || "FUND";
+    const parsedTargetRaise = targetRaise ?? 0;
+    const parsedMinimumInvestment = minimumInvestment ?? 0;
 
     const fund = await prisma.fund.create({
       data: {
@@ -160,38 +91,43 @@ export async function POST(req: NextRequest) {
         entityMode: resolvedEntityMode,
         style: style || null,
         fundSubType: fundSubType || null,
+        fundStrategy: fundStrategy || null,
+        instrumentType: instrumentType || null,
         targetRaise: parsedTargetRaise,
         minimumInvestment: parsedMinimumInvestment,
         currency: currency || "USD",
-        aumTarget: aumTarget ? parseFloat(aumTarget) : null,
+        aumTarget: aumTarget ?? null,
         callFrequency: callFrequency || "AS_NEEDED",
         capitalCallThresholdEnabled: thresholdEnabled || false,
-        capitalCallThreshold: thresholdAmount ? parseFloat(thresholdAmount) : null,
+        capitalCallThreshold: thresholdAmount ?? null,
         stagedCommitmentsEnabled: stagedCommitmentsEnabled || false,
         // Fund Economics (store percentages as decimals: 2.5% → 0.0250)
-        managementFeePct: parsedManagementFee !== null ? parsedManagementFee / 100 : null,
-        carryPct: parsedCarry !== null ? parsedCarry / 100 : null,
-        hurdleRate: parsedHurdle !== null ? parsedHurdle / 100 : null,
+        managementFeePct: managementFeePct != null ? managementFeePct / 100 : null,
+        carryPct: carryPct != null ? carryPct / 100 : null,
+        hurdleRate: hurdleRate != null ? hurdleRate / 100 : null,
         waterfallType: waterfallType || null,
-        termYears: parsedTermYears,
-        extensionYears: parsedExtensionYears,
+        termYears: termYears ?? null,
+        extensionYears: extensionYears ?? null,
         highWaterMark: highWaterMark ?? false,
-        gpCommitmentAmount: parsedGpCommitment,
-        gpCommitmentPct: parsedGpCommitmentPct !== null ? parsedGpCommitmentPct / 100 : null,
+        gpCommitmentAmount: gpCommitmentAmount ?? null,
+        gpCommitmentPct: gpCommitmentPct != null ? gpCommitmentPct / 100 : null,
         recyclingEnabled: recyclingEnabled ?? false,
         keyPersonEnabled: keyPersonEnabled ?? false,
         keyPersonName: keyPersonEnabled ? (keyPersonName || null) : null,
-        noFaultDivorceThreshold: parsedNoFaultThreshold,
-        investmentPeriodYears: parsedInvestmentPeriod,
+        noFaultDivorceThreshold: noFaultDivorceThreshold ?? null,
+        investmentPeriodYears: investmentPeriodYears ?? null,
         preferredReturnMethod: preferredReturnMethod || "COMPOUNDED",
         clawbackProvision: clawbackProvision ?? true,
-        mgmtFeeOffsetPct: mgmtFeeOffsetPct ? parseFloat(mgmtFeeOffsetPct) : null,
+        mgmtFeeOffsetPct: mgmtFeeOffsetPct ?? null,
         regulationDExemption: regulationDExemption || null,
+        investmentCompanyExemption: investmentCompanyExemption || null,
         marketplaceInterest: marketplaceInterest ?? false,
         marketplaceDescription: marketplaceDescription || null,
         marketplaceCategory: marketplaceCategory || null,
         marketplaceInterestDate: marketplaceInterest ? new Date() : null,
-        wireInstructions: wireInstructions || null,
+        wireInstructions: (wireInstructions as Prisma.InputJsonValue) || Prisma.JsonNull,
+        useOfProceeds: useOfProceeds || null,
+        salesCommissions: salesCommissions != null ? String(salesCommissions) : null,
         createdBy: auth.userId,
         audit: [
           {
@@ -203,11 +139,11 @@ export async function POST(req: NextRequest) {
               fundSubType,
               targetRaise,
               minimumInvestment,
-              managementFeePct: parsedManagementFee,
-              carryPct: parsedCarry,
-              hurdleRate: parsedHurdle,
+              managementFeePct,
+              carryPct,
+              hurdleRate,
               waterfallType,
-              termYears: parsedTermYears,
+              termYears,
               highWaterMark,
             },
           },
@@ -222,7 +158,7 @@ export async function POST(req: NextRequest) {
         totalOutbound: 0,
         totalCommitted: 0,
         thresholdEnabled: thresholdEnabled || false,
-        thresholdAmount: thresholdAmount ? parseFloat(thresholdAmount) : null,
+        thresholdAmount: thresholdAmount ?? null,
         audit: [
           {
             timestamp: new Date().toISOString(),
@@ -233,9 +169,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ 
-      success: true, 
-      fund: { id: fund.id, name: fund.name } 
+    return NextResponse.json({
+      success: true,
+      fund: { id: fund.id, name: fund.name }
     });
   } catch (error: unknown) {
     reportError(error as Error);

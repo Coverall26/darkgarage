@@ -15,6 +15,7 @@ import {
   requireFundroomActive,
   PAYWALL_ERROR,
 } from "@/lib/auth/paywall";
+import { sendSigningInvitationEmail } from "@/lib/emails/send-esign-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -77,12 +78,17 @@ export async function POST(
       recordDocumentSent(userTeam.teamId)
     ).catch((e) => reportError(e as Error));
 
-    // TODO: Wire actual email sending via Resend for each SENT recipient
-    // For each recipient with status SENT, send signing email with:
-    // - signingToken URL
-    // - envelope.emailSubject
-    // - envelope.emailMessage
-    // - org branding
+    // Fire-and-forget: Send signing invitation emails to SENT recipients
+    if (sent?.recipients) {
+      const sentRecipients = sent.recipients.filter(
+        (r) => r.status === "SENT" && r.role === "SIGNER"
+      );
+      for (const r of sentRecipients) {
+        sendSigningInvitationEmail(r.id, id).catch((e) =>
+          reportError(e as Error)
+        );
+      }
+    }
 
     return NextResponse.json(sent);
   } catch (error) {

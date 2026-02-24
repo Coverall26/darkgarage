@@ -1,7 +1,7 @@
 # FundRoom.ai — Environment Variables Reference
 
-**Last Updated:** February 20, 2026
-**Total Variables:** ~200 unique env vars across 20 categories
+**Last Updated:** February 23, 2026
+**Total Variables:** ~170 unique env vars across 20 categories (cleaned Feb 23 — removed ~25 unused/legacy vars)
 **Config File:** `.env.example` (copy to `.env` and fill in values)
 
 ---
@@ -55,7 +55,8 @@ PAYWALL_BYPASS=true
 |----------|----------|-------------|---------|---------|
 | `SUPABASE_DATABASE_URL` | **Yes** | Supabase Postgres connection string (session pooler, port 5432) | `postgresql://postgres.[project]:[pw]@aws-0-us-east-1.pooler.supabase.com:5432/postgres` | — |
 | `DATABASE_URL` | Fallback | Used if SUPABASE_DATABASE_URL not set | `postgresql://localhost:5432/fundroom` | localhost |
-| `REPLIT_DATABASE_URL` | No | Replit Postgres backup database | — | — |
+| `DATABASE_CONNECTION_LIMIT` | No | Connection pool limit (Supabase session pooler) | `10` | `10` |
+| `REPLIT_DATABASE_URL` | No | Backup PostgreSQL database connection string | — | — |
 | `BACKUP_DB_ENABLED` | No | Enable/disable backup database writes | `false` | `false` |
 
 **Key files:** `lib/prisma.ts`, `lib/prisma/backup-client.ts`
@@ -77,7 +78,6 @@ PAYWALL_BYPASS=true
 | `INTERNAL_API_KEY` | **Yes** | API key for internal service-to-service calls | `<32+ char string>` | — |
 | `REVALIDATE_TOKEN` | **Yes** | ISR revalidation token | `<strong-random-string>` | — |
 | `AUTH_DEBUG` | No | Enable verbose auth logging (dev only) | `true` | `false` |
-| `AUTH_BEARER_TOKEN` | No | Bearer token for Vercel domain management API | — | — |
 | `HANKO_API_KEY` | No | Passkey authentication (Hanko) — Phase 2 | — | — |
 | `NEXT_PUBLIC_HANKO_TENANT_ID` | No | Hanko tenant ID for passkey UI | — | — |
 
@@ -91,14 +91,13 @@ PAYWALL_BYPASS=true
 |----------|----------|-------------|---------|---------|
 | `RESEND_API_KEY` | **Yes** | Resend API key for transactional email | `re_abc123...` | — |
 | `RESEND_FROM_EMAIL` | No | Default from address | `FundRoom <noreply@fundroom.ai>` | `noreply@fundroom.ai` |
-| `RESEND_BASE_URL` | No | Override Resend API base URL | — | `https://api.resend.com` |
-| `RESEND_CONTACT_BOOK_ID` | No | Resend audience/contact book ID | — | — |
 | `RESEND_WEBHOOK_SECRET` | No | Resend webhook signature secret (Svix HMAC) | — | — |
 | `EMAIL_PROVIDER` | No | Email provider selector | `resend` | `resend` |
 | `EMAIL_DOMAIN` | No | Default email sending domain | `fundroom.ai` | Falls back to `NEXT_PUBLIC_PLATFORM_DOMAIN` |
 | `EMAIL_FROM` | No | Default from address | `noreply@fundroom.ai` | `noreply@{domain}` |
 | `EMAIL_FROM_NAME` | No | Default sender display name | `FundRoom.ai` | `FundRoom.ai` |
 | `VERIFICATION_EMAIL_BASE_URL` | No | Override base URL for email verification links | — | Falls back to `NEXTAUTH_URL` |
+| `MAILER_FROM_EMAIL` | No | Legacy mailer from email | — | Falls back to `RESEND_FROM_EMAIL` |
 
 **Architecture:**
 - Tier 1 (Platform): Always sends from `@fundroom.ai` — auth, billing, onboarding
@@ -130,7 +129,6 @@ PAYWALL_BYPASS=true
 | `STORAGE_BUCKET` | If S3 | S3 bucket name | `fundroom-documents` | — |
 | `STORAGE_REGION` | If S3 | S3 region | `us-east-1` | — |
 | `STORAGE_ACCESS_KEY_ID` | If S3 | S3 access key ID | — | — |
-| `STORAGE_ACCESS_KEY` | If S3 | S3 access key (alias for ACCESS_KEY_ID) | — | — |
 | `STORAGE_SECRET_ACCESS_KEY` | If S3 | S3 secret key | — | — |
 | `STORAGE_ENDPOINT` | If R2 | Custom S3-compatible endpoint (Cloudflare R2) | — | — |
 | `STORAGE_LOCAL_PATH` | If local | Local filesystem path | `./.storage` | `./.storage` |
@@ -160,9 +158,10 @@ PAYWALL_BYPASS=true
 | `ROLLBAR_SERVER_TOKEN` | **Yes** | Rollbar server-side error tracking | `<token>` | — |
 | `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN` | Recommended | Rollbar client-side error tracking | `<token>` | `disabled` |
 | `ROLLBAR_READ_TOKEN` | No | Rollbar read access (dashboards) | `<token>` | — |
-| `ROLLBAR_WEBHOOK_SECRET` | No | Rollbar webhook signature secret | `<secret>` | — |
-| `TINYBIRD_TOKEN` | Recommended | Tinybird server-side analytics | `<token>` | — |
-| `TINYBIRD_HOST` | No | Tinybird API host | `https://api.us-west-2.aws.tinybird.co` | US West 2 |
+| `ROLLBAR_POST_SERVER_ITEM_ACCESS_TOKEN` | No | Alternative server token name (fallback) | `<token>` | — |
+| `ROLLBAR_WEBHOOK_SECRET` | No | Rollbar → app notification webhook secret | `<secret>` | — |
+| `POSTHOG_SERVER_KEY` | Recommended | PostHog server-side analytics | `phx_...` | — |
+| `POSTHOG_HOST` | No | PostHog API host | `https://us.i.posthog.com` | PostHog US cloud |
 | `NEXT_PUBLIC_POSTHOG_KEY` | No | PostHog client analytics (disabled if not set) | `phc_...` | — |
 | `NEXT_PUBLIC_POSTHOG_HOST` | No | PostHog API host | `https://app.posthog.com` | PostHog cloud |
 | `NEXT_PUBLIC_POSTHOG_UI_HOST` | No | PostHog UI host (separate from API) | — | Same as `NEXT_PUBLIC_POSTHOG_HOST` |
@@ -180,18 +179,7 @@ PAYWALL_BYPASS=true
 | `STRIPE_SECRET_KEY` | Phase 2 | Stripe secret key | `sk_live_...` | — |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Phase 2 | Stripe publishable key | `pk_live_...` | — |
 | `STRIPE_WEBHOOK_SECRET` | Phase 2 | Stripe SaaS webhook signing secret | `whsec_...` | — |
-| `STRIPE_LIST_ID` | No | Stripe Radar fraud prevention list ID | — | — |
-
-**Legacy/migration keys:**
-
-| Variable | Description |
-|----------|-------------|
-| `STRIPE_SECRET_KEY_LIVE` | Live key (migration) |
-| `STRIPE_SECRET_KEY_OLD` | Old key (migration) |
-| `STRIPE_SECRET_KEY_LIVE_OLD` | Old live key (migration) |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE` | Live publishable key |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_OLD` | Old publishable key |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE_OLD` | Old live publishable key |
+| `STRIPE_BFG_WEBHOOK_SECRET` | No | Legacy BFG Stripe webhook (remove after migration) | `whsec_...` | — |
 
 #### CRM Billing (Organization-level)
 
@@ -229,6 +217,18 @@ PAYWALL_BYPASS=true
 | Parallel Markets | `PARALLEL_MARKETS_API_KEY`, `PARALLEL_MARKETS_CLIENT_ID`, `PARALLEL_MARKETS_BUSINESS_ID`, `PARALLEL_MARKETS_WEBHOOK_SECRET` |
 | VerifyInvestor | `VERIFY_INVESTOR_API_KEY`, `VERIFY_INVESTOR_CLIENT_ID`, `VERIFY_INVESTOR_OFFERING_ID`, `VERIFY_INVESTOR_WEBHOOK_SECRET` |
 
+**Plaid Bank Connectivity (Phase 2):**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PLAID_CLIENT_ID` | Phase 2 | Plaid client ID |
+| `PLAID_SECRET` | Phase 2 | Plaid secret key |
+| `PLAID_ENV` | Phase 2 | Plaid environment (`sandbox` / `production`) |
+| `PLAID_ENABLED` | No | Set `true` to enable Plaid bank connectivity (default: `false`) |
+| `PLAID_TOKEN_ENCRYPTION_KEY` | Phase 2 | Plaid token encryption (falls back to `NEXTAUTH_SECRET`) |
+| `PLAID_WEBHOOK_URL` | Phase 2 | Plaid webhook callback URL |
+| `PLAID_WEBHOOK_SECRET` | Phase 2 | Plaid webhook signature secret |
+
 **Key files:** `lib/providers/kyc/index.ts`, `lib/persona.ts`
 
 ---
@@ -246,6 +246,8 @@ PAYWALL_BYPASS=true
 | `SIGNATURE_VERIFICATION_SECRET` | **Yes** | Signature checksum secret | Falls back to `NEXTAUTH_SECRET` |
 | `NEXT_PRIVATE_DOCUMENT_PASSWORD_KEY` | **Yes** | Password-protected document encryption key | Any strong string |
 | `NEXT_PRIVATE_VERIFICATION_SECRET` | **Yes** | Email/link verification secret | Any strong string |
+| `ENCRYPTION_KEY` | **Yes** | Generic encryption key (AES-256, used by MFA fallback) | 64-char hex |
+| `MFA_ENCRYPTION_KEY` | Phase 2 | MFA TOTP secret encryption (falls back to ENCRYPTION_KEY) | 64-char hex |
 | `NEXT_PRIVATE_UNSUBSCRIBE_JWT_SECRET` | **Yes** | JWT secret for unsubscribe links | Any strong string |
 
 **All salts must be unique.** Generate with: `openssl rand -hex 32`
@@ -265,6 +267,8 @@ PAYWALL_BYPASS=true
 | `NEXT_PUBLIC_LOGIN_DOMAIN` | No | Login subdomain | `app.login.fundroom.ai` | — |
 | `NEXT_PUBLIC_ADMIN_DOMAIN` | No | Admin subdomain | `app.admin.fundroom.ai` | — |
 | `NEXT_PUBLIC_MARKETING_URL` | No | Marketing site URL | `https://fundroom.ai` | `https://fundroom.ai` |
+| `NEXT_PUBLIC_APP_URL` | No | App URL (e-signature callbacks) | `https://app.fundroom.ai` | — |
+| `NEXT_PUBLIC_WEBHOOK_BASE_HOST` | No | Webhook base host | — | — |
 | `NEXT_PUBLIC_PLATFORM_NAME` | No | Platform display name | `FundRoom AI` | `FundRoom AI` |
 | `NEXT_PUBLIC_PLATFORM_SUPPORT_EMAIL` | No | Support email | `support@fundroom.ai` | — |
 | `NEXT_PUBLIC_PLATFORM_SECURITY_EMAIL` | No | Security contact email | `security@fundroom.ai` | — |
@@ -311,7 +315,8 @@ PAYWALL_BYPASS=true
 | `QSTASH_TOKEN` | No | Upstash QStash for scheduled jobs | — | — |
 | `QSTASH_CURRENT_SIGNING_KEY` | No | QStash webhook signing key (current) | — | — |
 | `QSTASH_NEXT_SIGNING_KEY` | No | QStash webhook signing key (next rotation) | — | — |
-| `CRON_SECRET` | No | Secret for authenticating cron job requests | — | — |
+| `CRON_SECRET` | **Yes** | Bearer token for cron job authentication (timing-safe) | `<strong-random>` | — |
+| `TRIGGER_SECRET_KEY` | No | Trigger.dev background jobs secret key | — | — |
 
 **Key files:** `lib/cron/index.ts`, `app/api/cron/`
 
@@ -321,13 +326,15 @@ PAYWALL_BYPASS=true
 
 | Variable | Required | Description | Example | Default |
 |----------|----------|-------------|---------|---------|
-| `VERCEL_TOKEN` | No | Vercel API access token | — | — |
-| `VERCEL_ORG_ID` | No | Vercel team/org ID | `team_UhYGRc30...` | — |
-| `VERCEL_PROJECT_ID` | No | Vercel project ID | `prj_TrkpUM6U...` | — |
-| `PROJECT_ID_VERCEL` | No | Vercel project ID (domain management) | — | — |
-| `TEAM_ID_VERCEL` | No | Vercel team ID (domain management) | — | — |
-| `VERCEL` | Auto-set | Set to `"1"` when running on Vercel | `1` | — |
-| `NEXT_PUBLIC_VERCEL_ENV` | Auto-set | Vercel environment (production/preview/development) | `production` | — |
+| `PROJECT_ID_VERCEL` | No | Vercel project ID (domain management API) | — | — |
+| `TEAM_ID_VERCEL` | No | Vercel team ID (domain management API) | — | — |
+| `AUTH_BEARER_TOKEN` | No | Bearer token for Vercel domain management API | — | — |
+
+**Auto-set by Vercel runtime** (do not configure manually):
+- `VERCEL` — Set to `"1"` when running on Vercel
+- `VERCEL_ENV` — Set to `production` / `preview` / `development`
+- `NEXT_PUBLIC_VERCEL_ENV` — Client-accessible Vercel environment
+- `VERCEL_GIT_COMMIT_SHA` — Current git commit hash
 
 **Key files:** Vercel dashboard, `vercel.json`, `lib/domains.ts`
 
@@ -367,7 +374,10 @@ PAYWALL_BYPASS=true
 | `DEFAULT_GP_EMAIL` | No | Default GP email for LP notifications | — | — |
 | `ADMIN_TEMP_PASSWORD` | No | Temp password for seeded admin user | — | — |
 | `ADMIN_SEED_PASSWORD` | No | Seed script admin password | — | — |
+| `GP_SEED_PASSWORD` | No | Demo GP account password (seed script) | — | Built-in default |
+| `LP_SEED_PASSWORD` | No | Demo LP account password (seed script) | — | Built-in default |
 | `AUDIT_LOG_RETENTION_DAYS` | No | Audit log retention (days) | `2555` | `2555` (~7 years, SEC compliance) |
+| `SIGNATURE_AUDIT_LOG_RETENTION_DAYS` | No | Signature audit log retention (days) | `2555` | `2555` |
 
 **Key files:** `lib/constants/admins.ts`, `prisma/seed-bermuda.ts`, `prisma/seed-platform-admin.ts`
 
@@ -380,7 +390,6 @@ PAYWALL_BYPASS=true
 | `PAYWALL_BYPASS` | **MVP** | Bypass paywall checks (set `true` for MVP) | `true` | — |
 | `BACKUP_DB_ENABLED` | No | Enable backup database writes | `false` | `false` |
 | `AUTH_DEBUG` | No | Verbose auth logging (dev only) | `false` | `false` |
-| `SKIP_ENV_VALIDATION` | No | Skip Next.js env validation | `false` | `false` |
 | `ENFORCE_CSP` | No | Enforce CSP (true=enforce, false=report-only) | `false` | `false` |
 
 ---
@@ -406,7 +415,36 @@ PAYWALL_BYPASS=true
 | `PPMK_TRIAL_SLACK_WEBHOOK_URL` | No | Slack webhook for trial events | — | — |
 | `WEBHOOK_SECRET` | No | LP investor update webhook secret | — | — |
 | `EDGE_CONFIG` | No | Vercel Edge Config connection string | — | — |
-| `EDGE_CONFIG_ID` | No | Vercel Edge Config ID | — | — |
+
+---
+
+### 21. Push Notifications (VAPID)
+
+| Variable | Required | Description | Example | Default |
+|----------|----------|-------------|---------|---------|
+| `VAPID_PUBLIC_KEY` | No | Web Push VAPID public key | — | — |
+| `VAPID_PRIVATE_KEY` | No | Web Push VAPID private key | — | — |
+
+**Status:** Optional. Used for browser push notifications.
+
+---
+
+### 22. CloudFront CDN (Optional)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXT_PRIVATE_UPLOAD_DISTRIBUTION_HOST` | No | CloudFront distribution host |
+| `NEXT_PRIVATE_ADVANCED_UPLOAD_DISTRIBUTION_HOST` | No | Advanced upload CDN host |
+
+**Status:** Only needed if using CloudFront CDN for document delivery.
+
+---
+
+## Removed Variables (Feb 23, 2026)
+
+The following variables were removed from `.env.example` as they are unused in the codebase:
+
+`JITSU_HOST`, `JITSU_WRITE_KEY`, `NEXT_PUBLIC_GTM_ID`, `STRIPE_SECRET_KEY_LIVE`, `STRIPE_SECRET_KEY_OLD`, `STRIPE_SECRET_KEY_LIVE_OLD`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_OLD`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_LIVE_OLD`, `STRIPE_LIST_ID`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `EDGE_CONFIG_ID`, `SVIX_SERVER_URL`, `SVIX_TOKEN`, `NEXT_TRIGGER_URL`, `QSTASH_REGION`, `RESEND_BASE_URL`, `RESEND_CONTACT_BOOK_ID`, `SKIP_ENV_VALIDATION`, `NEXT_PUBLIC_DEBUG`, `NEXT_PUBLIC_WEBHOOK_BASE_URL`, `AWS_S3_BUCKET_NAME`, `HANKO_API_URL`, `PLAID_ENVIRONMENT` (duplicate of `PLAID_ENV`), `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `VERCEL_TOKEN`
 
 ---
 
@@ -423,6 +461,8 @@ PAYWALL_BYPASS=true
 - [ ] `INTERNAL_API_KEY` — strong random string (32+ chars)
 - [ ] `STORAGE_PROVIDER` — `vercel` for Vercel deployment
 - [ ] `STORAGE_ENCRYPTION_KEY` — unique 64-char hex
+- [ ] `ENCRYPTION_KEY` — unique 64-char hex (generic AES-256)
+- [ ] `CRON_SECRET` — strong random string for cron job auth
 - [ ] All 5 encryption salts — unique 64-char hex strings each
 - [ ] `NEXT_PRIVATE_DOCUMENT_PASSWORD_KEY` — strong encryption key
 - [ ] `NEXT_PRIVATE_VERIFICATION_SECRET` — strong secret
@@ -430,7 +470,7 @@ PAYWALL_BYPASS=true
 
 ### High (Recommended)
 - [ ] `UPSTASH_REDIS_REST_URL/TOKEN` — production rate limiting
-- [ ] `TINYBIRD_TOKEN` — server analytics
+- [ ] `POSTHOG_SERVER_KEY` — server analytics
 - [ ] `NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN` — client error tracking
 - [ ] `PAYWALL_BYPASS=true` — MVP launch (change to `false` when Stripe ready)
 

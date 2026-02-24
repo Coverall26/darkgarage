@@ -75,7 +75,7 @@ export class S3DownloadService {
 
       const nodeReadable = Readable.fromWeb(response.body as ReadableStream);
       nodeReadable
-        .on("error", (err: any) => stream.emit("error", err))
+        .on("error", (err: Error) => stream.emit("error", err))
         .pipe(stream);
     } catch (e) {
       stream.emit("error", e);

@@ -11,10 +11,11 @@ import { authOptions } from "@/lib/auth/auth-options";
 import prisma from "@/lib/prisma";
 import { reportError } from "@/lib/error";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
+import { validateBody } from "@/lib/middleware/validate";
+import { CrmRoleUpdateSchema } from "@/lib/validations/teams";
 
 export const dynamic = "force-dynamic";
 
-const VALID_CRM_ROLES = ["VIEWER", "CONTRIBUTOR", "MANAGER"];
 const ADMIN_ROLES = ["OWNER", "SUPER_ADMIN", "ADMIN"];
 
 export async function PATCH(
@@ -45,22 +46,10 @@ export async function PATCH(
       );
     }
 
-    const body = await req.json();
-    const { userId, crmRole } = body;
-
-    if (!userId || typeof userId !== "string") {
-      return NextResponse.json(
-        { error: "userId is required" },
-        { status: 400 },
-      );
-    }
-
-    if (!crmRole || !VALID_CRM_ROLES.includes(crmRole)) {
-      return NextResponse.json(
-        { error: `crmRole must be one of: ${VALID_CRM_ROLES.join(", ")}` },
-        { status: 400 },
-      );
-    }
+    // Validate body with Zod schema
+    const parsed = await validateBody(req, CrmRoleUpdateSchema);
+    if (parsed.error) return parsed.error;
+    const { userId, crmRole } = parsed.data;
 
     // Verify target user is a member of this team
     const targetMember = await prisma.userTeam.findFirst({

@@ -6,6 +6,8 @@ import {
 } from "@/lib/marketplace";
 import { verifyNotBot } from "@/lib/security/bot-protection";
 import { reportError } from "@/lib/error";
+import { validateBody } from "@/lib/middleware/validate";
+import { DealDocumentSchema } from "@/lib/validations/esign-outreach";
 
 export const dynamic = "force-dynamic";
 
@@ -48,27 +50,23 @@ export async function POST(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const parsed = await validateBody(req, DealDocumentSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
-    if (!body.name) {
-      return NextResponse.json(
-        { error: "name is required" },
-        { status: 400 },
-      );
-    }
-
+    // DealDocumentSchema requires `title` — map to downstream `name` field
     const document = await createDealDocument(
       dealId,
       {
-        name: body.name,
-        description: body.description,
-        category: body.category,
+        name: body.title,
+        description: body.notes ?? undefined,
+        category: body.documentType,
         storageKey: body.storageKey,
-        storageType: body.storageType,
-        fileType: body.fileType,
-        fileSize: body.fileSize,
-        requiredStage: body.requiredStage,
-        restricted: body.restricted,
+        storageType: undefined,
+        fileType: undefined,
+        fileSize: undefined,
+        requiredStage: undefined,
+        restricted: undefined,
       },
       auth.userId,
     );
@@ -91,24 +89,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const auth = await authenticateGP(teamId);
     if ("error" in auth) return auth.error;
 
-    const body = await req.json();
+    const url = new URL(req.url);
+    const documentId = url.searchParams.get("documentId");
 
-    if (!body.documentId) {
+    if (!documentId) {
       return NextResponse.json(
-        { error: "documentId is required" },
+        { error: "documentId query parameter is required" },
         { status: 400 },
       );
     }
 
+    const parsed = await validateBody(req, DealDocumentSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
+
     const { updateDealDocument } = await import("@/lib/marketplace");
     const document = await updateDealDocument(
-      body.documentId,
+      documentId,
       {
-        name: body.name,
-        description: body.description,
-        category: body.category,
-        requiredStage: body.requiredStage,
-        restricted: body.restricted,
+        name: body.title,
+        description: body.notes ?? undefined,
+        category: body.documentType,
+        requiredStage: undefined,
+        restricted: undefined,
       },
       auth.userId,
     );

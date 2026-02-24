@@ -6,17 +6,19 @@ import NewQuestion from "@/components/emails/new-question";
 import { getTeamAdminEmails } from "@/lib/constants/admins";
 import { createAdminMagicLink } from "@/lib/auth/admin-magic-link";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { ViewerQuestionSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   if (req.method === "POST") {
-    const { viewId, content, documentId, dataroomId, linkId, pageNumber, viewerEmail, viewerName } = req.body;
-
-    if (!viewId || !content) {
-      return res.status(400).json({ error: "View ID and question content are required" });
+    const parsed = validateBodyPagesRouter(req.body, ViewerQuestionSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
     }
+    const { viewId, content, documentId, dataroomId, linkId, pageNumber, viewerEmail, viewerName } = parsed.data;
 
     try {
       const view = await prisma.view.findUnique({

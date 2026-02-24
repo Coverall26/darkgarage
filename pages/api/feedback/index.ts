@@ -3,6 +3,8 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { ratelimit } from "@/lib/redis";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { FeedbackResponseSchema } from "@/lib/validations/teams";
 
 const feedbackLimiter = ratelimit(20, "60 s");
 
@@ -27,15 +29,11 @@ export default async function handle(
     }
 
     // POST /api/feedback
-    const { answer, feedbackId, viewId } = req.body as {
-      answer: string;
-      feedbackId: string;
-      viewId: string;
-    };
-
-    if (!answer || !feedbackId || !viewId) {
-      return res.status(400).json({ error: "Missing required fields" });
+    const parsed = validateBodyPagesRouter(req.body, FeedbackResponseSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
     }
+    const { answer, feedbackId, viewId } = parsed.data;
 
     try {
       const feedback = await prisma.feedback.findUnique({

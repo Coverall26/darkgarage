@@ -6,6 +6,9 @@ import { nanoid } from "nanoid";
 import { sendEmail } from "@/lib/resend";
 import SignatureRequestEmail from "@/components/emails/signature-request";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
+import { SignatureBulkCreateSchema } from "@/lib/validations/teams";
+import { DocumentStorageType } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
@@ -31,7 +34,7 @@ export default async function handler(
         id: teamId,
         users: {
           some: {
-            userId: (session.user as any).id,
+            userId: session.user.id,
           },
         },
       },
@@ -41,6 +44,10 @@ export default async function handler(
       return res.status(404).json({ error: "Team not found" });
     }
 
+    const parsed = validateBodyPagesRouter(req.body, SignatureBulkCreateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
     const {
       title,
       description,
@@ -49,13 +56,7 @@ export default async function handler(
       emailSubject,
       emailMessage,
       recipients,
-    } = req.body;
-
-    if (!title || !file || !recipients || recipients.length === 0) {
-      return res.status(400).json({
-        error: "Title, file, and at least one recipient are required",
-      });
-    }
+    } = parsed.data;
 
     const fileUrl = typeof file === "string" ? file : (file?.url || file?.key || "");
     const numPages = typeof file === "object" ? (file?.numPages || 1) : 1;
@@ -68,7 +69,7 @@ export default async function handler(
       });
     }
 
-    const senderName = (session.user as any).name || "FundRoom";
+    const senderName = session.user.name || "FundRoom";
     const baseUrl = process.env.NEXTAUTH_URL || `https://${req.headers.host}`;
 
     const createdDocuments = [];
@@ -84,14 +85,14 @@ export default async function handler(
           title: `${title} - ${recipient.name}`,
           description,
           file: fileUrl,
-          storageType: resolvedStorageType,
+          storageType: resolvedStorageType as DocumentStorageType,
           numPages,
           emailSubject,
           emailMessage,
           status: "SENT",
           sentAt: new Date(),
           teamId,
-          createdById: (session.user as any).id,
+          createdById: session.user.id,
           recipients: {
             create: {
               name: recipient.name,

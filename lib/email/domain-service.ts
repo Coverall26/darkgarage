@@ -85,10 +85,10 @@ export async function createEmailDomain(
   }
 
   // Normalize DNS records from Resend response
-  const dnsRecords: DnsRecord[] = (data.records || []).map((r: any) => ({
-    type: r.type || r.record_type,
-    name: r.name || r.host,
-    value: r.value || r.data,
+  const dnsRecords: DnsRecord[] = (data.records || []).map((r: { type?: string; record_type?: string; name?: string; host?: string; value?: string; data?: string; priority?: number; ttl?: string }) => ({
+    type: r.type || r.record_type || "",
+    name: r.name || r.host || "",
+    value: r.value || r.data || "",
     priority: r.priority,
     ttl: r.ttl,
   }));
@@ -101,7 +101,7 @@ export async function createEmailDomain(
       emailDomain: domain,
       emailDomainStatus: data.status || "not_started",
       emailDomainRegion: region,
-      emailDomainDnsRecords: dnsRecords as any,
+      emailDomainDnsRecords: dnsRecords as unknown as string,
     },
   });
 
@@ -178,18 +178,18 @@ export async function getEmailDomainStatus(teamId: string): Promise<DomainStatus
   const status = (data.status || "not_started") as DomainStatus["status"];
 
   // Normalize DNS records
-  const dnsRecords: DnsRecord[] = (data.records || []).map((r: any) => ({
-    type: r.type || r.record_type,
-    name: r.name || r.host,
-    value: r.value || r.data,
+  const dnsRecords: DnsRecord[] = (data.records || []).map((r: { type?: string; record_type?: string; name?: string; host?: string; value?: string; data?: string; priority?: number; ttl?: string }) => ({
+    type: r.type || r.record_type || "",
+    name: r.name || r.host || "",
+    value: r.value || r.data || "",
     priority: r.priority,
     ttl: r.ttl,
   }));
 
   // Sync status to database
-  const updateData: Record<string, any> = {
+  const updateData: Record<string, unknown> = {
     emailDomainStatus: status,
-    emailDomainDnsRecords: dnsRecords as any,
+    emailDomainDnsRecords: dnsRecords as unknown as string,
   };
 
   // Mark verified timestamp

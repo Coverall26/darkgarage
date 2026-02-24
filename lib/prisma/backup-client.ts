@@ -1,12 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 
+import { isBackupDbEnabled } from "@/lib/feature-flags";
+
 let backupPrisma: PrismaClient | null = null;
 
 export function isBackupEnabled(): boolean {
-  return (
-    process.env.BACKUP_DB_ENABLED === "true" &&
-    !!process.env.REPLIT_DATABASE_URL
-  );
+  return isBackupDbEnabled() && !!process.env.REPLIT_DATABASE_URL;
 }
 
 export function getBackupPrismaClient(): PrismaClient | null {

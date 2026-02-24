@@ -3,7 +3,7 @@ import { webhookPayloadSchema } from "@/lib/zod/schemas/webhooks";
 
 import { WebhookTrigger } from "./types";
 
-export const prepareWebhookPayload = (trigger: WebhookTrigger, data: any) => {
+export const prepareWebhookPayload = (trigger: WebhookTrigger, data: Record<string, unknown>) => {
   const payload = webhookPayloadSchema.parse({
     id: newId("webhookEvent"),
     event: trigger,

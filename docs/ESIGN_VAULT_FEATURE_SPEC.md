@@ -873,7 +873,7 @@ Document Storage (multi-provider):
   ├── S3 + CloudFront (primary, KMS-encrypted, per-org prefixes)
   │   └── {teamId}/{docId}/{filename}
   ├── Vercel Blob (fallback)
-  └── Replit Object Storage (dev)
+  └── Local filesystem (dev)
 
 Encryption layers:
   1. Storage-level: S3 SSE-KMS or Vercel Blob encryption

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { randomBytes } from "crypto";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
@@ -13,6 +14,8 @@ import { sendLpCommitmentConfirmation } from "@/lib/emails/send-lp-commitment-co
 import { publishServerEvent } from "@/lib/tracking/server-events";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
 import { emitSSE, SSE_EVENTS } from "@/lib/sse/event-emitter";
+import { validateBody } from "@/lib/middleware/validate";
+import { CommitmentSchema } from "@/lib/validations/investment";
 
 export const dynamic = "force-dynamic";
 
@@ -30,14 +33,10 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const { fundId, units, amount, tierId, representations } = await req.json();
-
-    if (!fundId || !amount) {
-      return NextResponse.json(
-        { error: "Fund ID and amount are required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, CommitmentSchema);
+    if (parsed.error) return parsed.error;
+    const { fundId, amount: numAmount, tierId, representations } = parsed.data;
+    const numUnits = parsed.data.units ?? null;
 
     const user = await prisma.user.findUnique({
       where: { id: auth.userId },
@@ -157,28 +156,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Fund not found" }, { status: 404 });
     }
 
-    const numAmount = parseFloat(amount);
-    const numUnits = units ? parseInt(units, 10) : null;
-
-    if (isNaN(numAmount) || numAmount <= 0 || numAmount > 100_000_000_000) {
-      return NextResponse.json(
-        { error: "Invalid subscription amount" },
-        { status: 400 },
-      );
-    }
-
-    // Prevent representations DoS (limit key count)
-    if (representations && typeof representations === "object") {
-      const repKeys = Object.keys(representations);
-      if (repKeys.length > 20) {
-        return NextResponse.json(
-          { error: "Too many representation fields" },
-          { status: 400 },
-        );
-      }
-    }
-
-    if (!fund.flatModeEnabled && (numUnits === null || isNaN(numUnits) || numUnits < 1)) {
+    if (!fund.flatModeEnabled && numUnits === null) {
       return NextResponse.json(
         { error: "Invalid unit count for tiered subscription" },
         { status: 400 },
@@ -353,7 +331,7 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        await executePurchase(tx, fund.id, allocation.tierId, allocation.units);
+        await executePurchase(tx as unknown as Prisma.TransactionClient, fund.id, allocation.tierId, allocation.units);
       }
 
       const docAmount = fund.flatModeEnabled ? numAmount : computedAmount;
@@ -400,7 +378,7 @@ export async function POST(req: NextRequest) {
           units: numUnits,
           pricingTierId: selectedTier?.id,
           status: "PENDING",
-          tierBreakdown: tierAllocations.length > 0 ? (tierAllocations as any) : undefined,
+          tierBreakdown: tierAllocations.length > 0 ? (tierAllocations as unknown as Prisma.InputJsonValue) : undefined,
         },
       });
 

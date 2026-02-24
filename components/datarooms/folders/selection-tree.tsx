@@ -98,22 +98,18 @@ const SidebarFoldersSelection = ({
     return [];
   }, [folders]);
 
-  // Create a virtual "Home" folder
-  const homeFolder: Partial<DataroomFolderWithDocuments> = {
-    // @ts-ignore
-    id: null,
+  // Create a virtual "Home" folder for tree root
+  const homeFolder = {
+    id: null as unknown as string,
     name: "Home",
     path: "/",
     childFolders: nestedFolders,
     documents: [],
-  };
+  } as unknown as DataroomFolderWithDocuments;
 
   return (
     <FileTree>
-      {/* {nestedFolders.map((folder) => ( */}
       <FolderComponentSelection
-        // key={folder.id}
-        // @ts-ignore
         folder={homeFolder}
         selectedFolder={selectedFolder}
         setSelectedFolder={setSelectedFolder}

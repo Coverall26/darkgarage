@@ -1,6 +1,8 @@
-import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode, TransferType, TransferNetwork, ACHClass } from 'plaid';
+import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode, TransferType, TransferNetwork, ACHClass, ProcessorTokenCreateRequestProcessorEnum } from 'plaid';
 import crypto from 'crypto';
 import { importJWK, jwtVerify, type JWK } from 'jose';
+
+import { isPlaidFlagEnabled } from "@/lib/feature-flags";
 
 /**
  * Feature flag for Plaid integration.
@@ -8,10 +10,7 @@ import { importJWK, jwtVerify, type JWK } from 'jose';
  * Set PLAID_ENABLED=true AND provide PLAID_CLIENT_ID + PLAID_SECRET to activate.
  */
 export function isPlaidEnabled(): boolean {
-  if (process.env.PLAID_ENABLED === 'true' && process.env.PLAID_CLIENT_ID && process.env.PLAID_SECRET) {
-    return true;
-  }
-  return false;
+  return isPlaidFlagEnabled();
 }
 
 function getEncryptionKey(): string {
@@ -149,7 +148,7 @@ export async function createProcessorToken(accessToken: string, accountId: strin
   const response = await plaidClient.processorTokenCreate({
     access_token: accessToken,
     account_id: accountId,
-    processor: 'dwolla' as any,
+    processor: ProcessorTokenCreateRequestProcessorEnum.Dwolla,
   });
 
   return response.data.processor_token;

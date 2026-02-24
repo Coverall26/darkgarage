@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import prisma from "@/lib/prisma";
 import { authOptions } from "@/lib/auth/auth-options";
 import { reportError } from "@/lib/error";
+import { SignatureFieldType } from "@prisma/client";
 
 export default async function handler(
   req: NextApiRequest,
@@ -85,9 +86,20 @@ export default async function handler(
         }
       }
 
-      const templateFields = template.fields as any[] | null;
+      interface TemplateField {
+          type: string;
+          pageNumber: number;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          required?: boolean;
+          placeholder?: string;
+          recipientIndex?: number;
+        }
+      const templateFields = template.fields as TemplateField[] | null;
       if (templateFields && Array.isArray(templateFields) && templateFields.length > 0 && createdRecipientIds.length > 0) {
-        const fieldsToCreate = templateFields.map((field: any) => {
+        const fieldsToCreate = templateFields.map((field) => {
           let recipientId: string | null = null;
           const recipientIndex = field.recipientIndex ?? 0;
           if (recipientIndex >= 0 && recipientIndex < createdRecipientIds.length) {
@@ -99,7 +111,7 @@ export default async function handler(
           return {
             documentId: doc.id,
             recipientId,
-            type: field.type,
+            type: field.type as SignatureFieldType,
             pageNumber: field.pageNumber,
             x: field.x,
             y: field.y,

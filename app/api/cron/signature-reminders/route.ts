@@ -5,6 +5,7 @@ import { receiver, limiter } from "@/lib/cron";
 import { log } from "@/lib/utils";
 import { reportError } from "@/lib/error";
 import { sendSignatureReminderEmail } from "@/lib/emails/send-signature-reminder";
+import { requireCronAuth } from "@/lib/middleware/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -54,6 +55,10 @@ export async function POST(req: Request) {
     } catch {
       return new Response("Unauthorized", { status: 401 });
     }
+  } else {
+    // Defense-in-depth: verify CRON_SECRET in non-Vercel environments
+    const cronAuth = requireCronAuth(req);
+    if (cronAuth) return cronAuth;
   }
 
   try {

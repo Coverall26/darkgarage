@@ -10,9 +10,11 @@ import {
 } from "@/lib/crm";
 import { logContactActivity } from "@/lib/crm/contact-service";
 import { reportError } from "@/lib/error";
+import { validateBodyPagesRouter } from "@/lib/middleware/validate";
 import prisma from "@/lib/prisma";
 import { apiRateLimiter } from "@/lib/security/rate-limiter";
 import { CustomUser } from "@/lib/types";
+import { ContactUpdateSchema } from "@/lib/validations/teams";
 
 export default async function handle(
   req: NextApiRequest,
@@ -86,6 +88,10 @@ async function handleUpdate(
   userId: string,
 ) {
   try {
+    const parsed = validateBodyPagesRouter(req.body, ContactUpdateSchema);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", issues: parsed.issues });
+    }
     const {
       firstName,
       lastName,
@@ -98,20 +104,20 @@ async function handleUpdate(
       customFields,
       referralSource,
       notes,
-    } = req.body;
+    } = parsed.data;
 
     const input: ContactUpdateInput = {};
-    if (firstName !== undefined) input.firstName = firstName;
-    if (lastName !== undefined) input.lastName = lastName;
-    if (phone !== undefined) input.phone = phone;
-    if (company !== undefined) input.company = company;
-    if (title !== undefined) input.title = title;
-    if (status !== undefined) input.status = status;
+    if (firstName !== undefined) input.firstName = firstName ?? undefined;
+    if (lastName !== undefined) input.lastName = lastName ?? undefined;
+    if (phone !== undefined) input.phone = phone ?? undefined;
+    if (company !== undefined) input.company = company ?? undefined;
+    if (title !== undefined) input.title = title ?? undefined;
+    if (status !== undefined) input.status = status as ContactUpdateInput["status"];
     if (assignedToId !== undefined) input.assignedToId = assignedToId;
-    if (tags !== undefined) input.tags = tags;
-    if (customFields !== undefined) input.customFields = customFields;
-    if (referralSource !== undefined) input.referralSource = referralSource;
-    if (notes !== undefined) input.notes = notes;
+    if (tags !== undefined) input.tags = tags ?? undefined;
+    if (customFields !== undefined) input.customFields = (customFields ?? undefined) as ContactUpdateInput["customFields"];
+    if (referralSource !== undefined) input.referralSource = referralSource ?? undefined;
+    if (notes !== undefined) input.notes = notes ?? undefined;
 
     const updated = await updateContact(contactId, teamId, input);
     if (!updated) {

@@ -58,7 +58,7 @@ export function useTags({
       `/api/teams/${teamId}/tags?${new URLSearchParams({
         ...query,
         includeLinksCount,
-      } as Record<string, any>).toString()}`,
+      } as unknown as Record<string, string>).toString()}`,
     fetcher,
     {
       dedupingInterval: 100000,

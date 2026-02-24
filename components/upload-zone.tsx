@@ -348,7 +348,6 @@ export default function UploadZone({
         
         if (encryptionEnabled && encryptionSupported) {
           try {
-            console.log(`Encrypting file before upload: ${file.name}`);
             const encryptionResult = await encryptFileForUpload(file);
             fileToUpload = encryptionResult.encryptedFile;
             
@@ -366,11 +365,8 @@ export default function UploadZone({
               originalFileName: encryptionResult.originalName,
               originalFileSize: encryptionResult.originalSize,
             };
-            console.log(`File encrypted successfully: ${file.name}`);
-            
             // IMPORTANT: The encryptionKey should be stored securely by the user/app
             // It is NOT sent to the server - only the hash for verification
-            console.log(`[Encryption] Key hash stored for verification. Original key NOT transmitted.`);
           } catch (encryptError) {
             console.error(`Encryption failed for ${file.name}:`, encryptError);
             // Fall back to unencrypted upload
@@ -382,13 +378,10 @@ export default function UploadZone({
         if (!useTusUpload) {
           // Use putFile for Vercel Blob or Replit storage
           try {
-            console.log(`Starting ${uploadTransport} upload for:`, file.name);
             const result = await putFile({
               file: fileToUpload as File,
               teamId: teamInfo?.currentTeam?.id as string,
             });
-            console.log("putFile result:", result);
-            
             const { type, data } = result;
             
             if (!type || !data) {
@@ -409,7 +402,6 @@ export default function UploadZone({
               onUploadProgress(index, 99, undefined);
               return updatedUploads;
             });
-            console.log(`${uploadTransport} upload successful, key:`, uploadKey);
           } catch (error) {
             console.error(`${uploadTransport} upload error:`, error);
             setUploads((prev) =>

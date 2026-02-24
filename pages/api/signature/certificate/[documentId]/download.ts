@@ -45,7 +45,6 @@ export default async function handler(
       return res.status(404).json({ error: "Document not found" });
     }
 
-    // @ts-ignore - Field exists in schema
     if (!document.certificateFile) {
       return res.status(404).json({ error: "Certificate not yet generated" });
     }
@@ -61,7 +60,6 @@ export default async function handler(
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // @ts-ignore - Field exists in schema
     const certificatePath = document.certificateFile as string;
     
     const fileUrl = await getFile({ 
@@ -73,7 +71,6 @@ export default async function handler(
       return res.status(404).json({ error: "Certificate file not found" });
     }
 
-    // @ts-ignore
     const certificateId = document.certificateId || documentId;
     const filename = `completion-certificate-${certificateId}.pdf`;
 

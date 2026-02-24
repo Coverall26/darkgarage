@@ -5,14 +5,10 @@ import { reportError } from "@/lib/error";
 import { requireFundroomActiveByFund, PAYWALL_ERROR } from "@/lib/auth/paywall";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { requireLPAuthAppRouter } from "@/lib/auth/rbac";
+import { validateBody } from "@/lib/middleware/validate";
+import { StagedCommitmentSchema } from "@/lib/validations/investment";
 
 export const dynamic = "force-dynamic";
-
-interface CommitmentTranche {
-  amount: number;
-  scheduledDate: string;
-  label: string;
-}
 
 export async function GET(req: NextRequest) {
   const blocked = await appRouterRateLimit(req);
@@ -126,44 +122,13 @@ export async function POST(req: NextRequest) {
 
   try {
 
-    const body = await req.json();
-    const { totalCommitment, tranches, schedule, confirmTerms } = body;
-
-    if (!totalCommitment || !tranches || !Array.isArray(tranches)) {
-      return NextResponse.json(
-        { error: "Total commitment and tranches are required" },
-        { status: 400 },
-      );
-    }
-
-    if (
-      typeof totalCommitment !== "number" ||
-      totalCommitment <= 0 ||
-      totalCommitment > 100_000_000_000
-    ) {
-      return NextResponse.json(
-        { error: "Total commitment must be a positive number up to $100B" },
-        { status: 400 },
-      );
-    }
-
-    if (!confirmTerms) {
-      return NextResponse.json(
-        { error: "You must confirm the commitment terms" },
-        { status: 400 },
-      );
-    }
-
-    if (tranches.length < 2 || tranches.length > 12) {
-      return NextResponse.json(
-        { error: "Must have between 2 and 12 tranches" },
-        { status: 400 },
-      );
-    }
+    const parsed = await validateBody(req, StagedCommitmentSchema);
+    if (parsed.error) return parsed.error;
+    const { totalCommitment, tranches, schedule } = parsed.data;
 
     // Validate tranche amounts sum to total
     const trancheSum = tranches.reduce(
-      (sum: number, t: CommitmentTranche) => sum + t.amount,
+      (sum: number, t) => sum + t.amount,
       0,
     );
     if (Math.abs(trancheSum - totalCommitment) > 0.01) {
@@ -324,6 +289,7 @@ export async function POST(req: NextRequest) {
           data: {
             fundId: investor.fund!.id,
             investorId: investor.id,
+            teamId: investor.fund!.teamId,
             commitmentAmount: totalCommitment,
             fundedAmount: 0,
             status: "COMMITTED",
@@ -337,12 +303,13 @@ export async function POST(req: NextRequest) {
 
       // Persist each tranche as an InvestmentTranche row
       const trancheRecords = await Promise.all(
-        tranches.map((t: CommitmentTranche, i: number) =>
+        tranches.map((t, i) =>
           tx.investmentTranche.create({
             data: {
               investmentId: investment.id,
+              teamId: investor.fund!.teamId,
               trancheNumber: i + 1,
-              label: t.label,
+              label: (t.label ?? "") as string,
               amount: t.amount,
               fundedAmount: 0,
               scheduledDate: new Date(t.scheduledDate + "T00:00:00"),

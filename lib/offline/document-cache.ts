@@ -44,7 +44,7 @@ async function waitForServiceWorker(): Promise<ServiceWorker> {
   });
 }
 
-function sendSWMessage<T>(type: string, payload?: any): Promise<T> {
+function sendSWMessage<T>(type: string, payload?: unknown): Promise<T> {
   return new Promise(async (resolve, reject) => {
     try {
       const sw = await waitForServiceWorker();

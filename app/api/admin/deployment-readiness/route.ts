@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isPaywallBypassed } from "@/lib/feature-flags";
 import { reportError } from "@/lib/error";
 import prisma from "@/lib/prisma";
 import { checkDatabaseHealth } from "@/lib/prisma";
@@ -146,9 +147,9 @@ export async function GET() {
     });
 
     // ── 6. Analytics (optional) ──
-    checkEnvVar(checks, "Analytics", "TINYBIRD_TOKEN", {
+    checkEnvVar(checks, "Analytics", "POSTHOG_SERVER_KEY", {
       optional: true,
-      remediation: "Get token from Tinybird workspace",
+      remediation: "Get server API key from PostHog project settings",
     });
 
     // ── 7. Encryption Keys ──
@@ -211,12 +212,11 @@ export async function GET() {
     }
 
     // ── 10. Paywall Configuration ──
-    const paywallBypass = process.env.PAYWALL_BYPASS === "true";
     checks.push({
       category: "Billing",
       name: "Paywall configuration",
       status: "pass",
-      detail: paywallBypass
+      detail: isPaywallBypassed()
         ? "PAYWALL_BYPASS=true (MVP mode, no Stripe required)"
         : "Paywall enforced (Stripe integration active)",
     });

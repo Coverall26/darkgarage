@@ -15,6 +15,9 @@ import { reportError } from "@/lib/error";
 import { logAuditEvent } from "@/lib/audit/audit-logger";
 import { appRouterRateLimit } from "@/lib/security/rate-limiter";
 import { resolveCrmRole, type CrmRoleLevel } from "@/lib/auth/crm-roles";
+import { validateBody } from "@/lib/middleware/validate";
+import { ContactCreateSchema } from "@/lib/validations/teams";
+import { ContactStatus, ContactSource, Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -211,12 +214,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    const parsed = await validateBody(req, ContactCreateSchema);
+    if (parsed.error) return parsed.error;
+    const body = parsed.data;
 
-    // Validate required fields
-    if (!body.email || typeof body.email !== "string") {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
-    }
     const email = body.email.trim().toLowerCase();
 
     // Check for duplicate
@@ -240,10 +241,10 @@ export async function POST(req: NextRequest) {
         phone: body.phone?.trim() || null,
         company: body.company?.trim() || null,
         title: body.title?.trim() || null,
-        status: body.status || "PROSPECT",
-        source: body.source || "MANUAL_ENTRY",
-        tags: body.tags || null,
-        customFields: body.customFields || null,
+        status: (body.status as ContactStatus) || "PROSPECT",
+        source: (body.source as ContactSource) || "MANUAL_ENTRY",
+        tags: (body.tags as Prisma.InputJsonValue) || Prisma.JsonNull,
+        customFields: (body.customFields as Prisma.InputJsonValue) || Prisma.JsonNull,
         notes: body.notes?.trim() || null,
         investorId: body.investorId || null,
       },
